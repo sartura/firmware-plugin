@@ -1,0 +1,3 @@
+<action xmlns="urn:ietf:params:xml:ns:yang:1">
+  <system-restart xmlns="urn:ietf:params:xml:ns:yang:ietf-system"/>
+</action>

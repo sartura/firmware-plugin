@@ -1,0 +1,407 @@
+module terastream-software-hack {
+  namespace "http://terastrm.net/ns/yang/terastream-software-hack";
+
+  prefix "ts-swh";
+
+  // import statements here: e.g.,
+
+  import ietf-system {
+    prefix "sys";
+    revision-date 2014-08-06;
+  }
+
+  import ietf-inet-types {
+    prefix "inet";
+    revision-date 2013-07-15;
+  }
+
+  organization
+    "Deutsche Telekom AG";
+
+  contact
+    "Landgrabenweg 151
+    53227 Bonn, Germany
+    Editor: Ian Farrer <ian.farrer@telekom.de>";
+
+  description
+    "This module defines RPCs for the TeraStream home gateway project.";
+
+  revision "2017-11-01" {
+    description
+      "Version 0.1.4
+      Simplify to use single slot devices, removed slots from the YANG model.
+      Add sha-256 to checksum type.
+      Change features by authentication type.
+      Add leaf preserve-configuration.
+      Add max-elements to list software.
+      Changed namespace.
+      Add leaf name for key value.
+      Removed leaf path from software.
+      Add leaf serial-number to /sys:system-state/sys:platform.
+      Add RPC system-reset-restart.";
+  }
+
+  revision "2017-07-11" {
+    description
+      "Version 0.2.0
+      Replace RPC with config.";
+  }
+
+  revision "2014-02-06" {
+    description
+      "Version 0.1.5
+      Remove RPC get-job-status.
+      Remove transport choice, use URI with username instead.";
+  }
+
+  revision "2014-01-27" {
+    description
+      "Version 0.1.5
+      Move boot status to system module.";
+  }
+
+  revision "2014-01-20" {
+    description
+      "Version 0.1.4
+      Move download status to download-job.
+      Add RPC to fetch job status.
+      Add key to software-slots.
+      Use leafrefs to refer software-slots.
+      Remove system-reset RPC because that is covered by Netconf's delete-config(startup)+system-restart().
+      Re-include download RPCs.";
+  }
+
+  revision "2014-01-12" {
+    description
+      "Version 0.1.3
+      Move RPC software-download to transport-specific modules.";
+  }
+
+  revision "2014-01-09" {
+    description
+      "Version 0.1.2
+      Rename feature multiple-partitions to software-slots.";
+  }
+
+  revision "2013-12-19" {
+    description
+      "Version 0.1.1
+      Rename module to opencpe-software-mgmt.
+      Add target location to download RPC.";
+  }
+
+  revision "2013-12-12" {
+    description
+      "Version 0.1.0 -- Initial version.";
+  }
+
+  // feature statements
+
+  feature software-credentials-password {
+    description
+      "Indicates that the device can download new software using password authentication.";
+  }
+
+  feature software-credentials-certificate {
+    description
+      "Indicates that the device can download new software using certificate authentication.";
+  }
+
+  feature software-credentials-ssh-key {
+    description
+      "Indicates that the device can download new software using SSH key authentication.";
+  }
+
+  // identity statements
+
+  // typedef statements
+
+  typedef percent {
+    type uint8 {
+      range "0 .. 100";
+    }
+    description
+      "Percentage";
+  }
+
+  // grouping statements
+
+  // data definition statements
+
+  // augment statements
+
+  /*
+   * Configuration data nodes
+   */
+  augment "/sys:system" {
+
+    container software {
+      description "Software related stuff";
+
+      container download-policy {
+        presence true;
+
+        leaf download-attempts {
+          description "Number of attempts to download the file. 1 means we only
+            try once (no retries). 0 means we try indefinitely.";
+          type uint32;
+          default 0;
+        }
+
+        leaf retry-interval {
+          type uint32;
+          default 600;
+          units seconds;
+        }
+
+        leaf retry-randomness {
+          type uint32;
+          default 300;
+          units seconds;
+        }
+      }
+
+      container upgrade-policy {
+        presence true;
+        description "Specify policy for when upgrade (which usually involves reboot) is allowed to happen. All existing conditions must evaluate to true.";
+
+        leaf auto-upgrade {
+          type boolean;
+          default true;
+        }
+
+        list time-window {
+          // describe time windows for when we are allowed to upgrade
+          key id;
+          leaf id {
+            type uint32;
+          }
+          leaf-list dow {
+            type enumeration {
+              enum "Monday";
+              enum "Tuesday";
+              enum "Wednesday";
+              enum "Thursday";
+              enum "Friday";
+              enum "Saturday";
+              enum "Sunday";
+            }
+          }
+
+          leaf start-time {
+            type string; // fix type
+          }
+
+          leaf stop-time {
+            type string; // fix type
+          }
+        }
+
+        // other models can augment in more conditions here
+
+      }
+
+      list software {
+        description
+          "Information about the system software.";
+
+        key name;
+        max-elements 1;
+
+        leaf name {
+          description "temporary leaf for key value";
+          type string;
+        }
+
+        leaf source {
+          type inet:uri;
+          description
+            "URI of the software image including username. Depending on
+            the supported protocols, the following formats are possible:
+              - file://path
+              - http://[username@]host[:port]/path
+              - https://[username@]host[:port]/path
+              - ftp://[username@]host[:port]/path
+              - scp://[username@]host[:port]/path";
+        }
+
+        choice credentials {
+          description
+            "Type of authentication to use for software downloads.";
+
+          case password {
+            container password {
+              if-feature software-credentials-password;
+              presence true;
+              leaf password {
+                type string;
+                mandatory true;
+              }
+            }
+          }
+          // TODO: is certificate really different from ssh-key?
+          case certificate {
+            container certificate {
+              if-feature software-credentials-certificate;
+              presence true;
+              leaf path {
+                type string;
+                mandatory true;
+              }
+            }
+          }
+          case ssh-key {
+            container ssh-key {
+              if-feature software-credentials-ssh-key;
+              presence true;
+              leaf path {
+                type string;
+                mandatory true;
+              }
+            }
+          }
+        }
+
+        container checksum {
+          description "Expected checksum of the software image.";
+          presence checksum;
+
+          leaf type {
+            description "Checksum hash type";
+            mandatory true;
+            type enumeration {
+              // XXX: enumerating checksum types F sucks. Someone else should
+              // write a model for this that we can import... password hashes
+              // uses a value format that includes the hash type and salt, like
+              // $5$abc$98jlsdncsd but there is AFAIK no such format for normal
+              // file checksums (that do not use a salt) so we can't use an
+              // equivalent
+              enum "md5" {
+                value 0;
+              }
+              enum "sha-1" {
+                value 1;
+              }
+              enum "sha-2" {
+                value 2;
+              }
+              enum "sha-3" {
+                value 3;
+              }
+              enum "sha-256" {
+                value 4;
+              }
+            }
+          }
+
+          leaf value {
+            description "Checksum value";
+            mandatory true;
+            type string;
+          }
+        }
+        leaf preserve-configuration {
+          description "Preserve the system configuration when installing new software.";
+          type boolean;
+          default true;
+        }
+      }
+    }
+  }
+
+  /*
+   * Operational state data nodes
+   */
+  augment "/sys:system-state" {
+
+    list software {
+        description "State related to system software";
+
+        key name;
+        max-elements 1;
+
+        leaf name {
+          description "temporary leaf for key value";
+          type string;
+        }
+
+        leaf source {
+          description
+            "Source URI where to get the software.";
+          type inet:uri;
+        }
+
+        leaf version {
+          description
+            "Software version";
+          type string;
+        }
+
+        // is this necessary
+        leaf bootable {
+          description
+            "Indicates that the software is eligible for being booted.";
+          type boolean;
+          default false;
+        }
+
+        leaf status {
+          // TODO: need to go through FSM and figure out what states are needed
+          // NOTE: it's good to have states like "download-complete" even though
+          // they are highly transient. As soon as we progress from "downloading"
+          // to "download-complete" we will progress to the next state
+          // ("upgrading") but with NETCONF push we will get new messages on the
+          // state change so it will show that the "download-complete" state was
+          // reached
+          type enumeration {
+            enum dl-planned;
+            enum downloading;
+            enum download-failed;
+            enum dl-verification-failed;
+            enum download-done;
+            enum upgrade-in-progress;
+            enum upgrade-failed;
+            enum upgrade-done;
+            enum installed;
+            enum canceled;
+          }
+        }
+
+        leaf message {
+          description "Free flow status information meant for human consumption, in debugging or otherwise.";
+          type string;
+        }
+
+        leaf progress {
+          when "../status = 'dl-in-progress'";
+          type percent;
+        }
+
+    }
+
+  }
+
+  // TODO: probably remove this! should we really have this or just use /system-state/platform/os-(os-name|os-release|os-version) ??
+  //       check what IEEE 1003.1-2008 says about them. Should 'Linux' really go into os-name or should os-name be 'Ubuntu' and the kernel goes somewhere else?
+  augment "/sys:system-state/sys:platform" {
+    leaf software-version {
+      type string;
+      description
+        "Version of the currently running software";
+    }
+    leaf serial-number {
+      type string;
+      description
+        "Device serial number";
+    }
+  }
+
+  rpc system-reset-restart {
+    description
+      "Request that the entire system be restarted immediately with the factory settings.";
+  }
+
+  // notification statements
+
+  // DO NOT put deviation statements in a published module
+}
