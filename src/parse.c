@@ -256,7 +256,7 @@ int firmware_download(ctx_t *ctx)
         uint32_t time = ctx->firmware.policy.retry_interval + (rand() % ctx->firmware.policy.retry_randomness);
         INF("wait for %d seconds", time);
         char message[120];
-        sprintf(message, "download failed, starting new attempt in %d", time);
+        sprintf(message, "download failed, starting new attempt in %d seconds", time);
         SET_MEM_STR(ctx->oper.message, message);
         sleep(time);
     }
