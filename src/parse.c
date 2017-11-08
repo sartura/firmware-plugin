@@ -11,13 +11,18 @@
 #include <sys/wait.h>
 #include <time.h>
 
+#include <json-c/json.h>
+#include <libubus.h>
+#include <libubox/blobmsg.h>
+#include <libubox/blobmsg_json.h>
+
 #include <libubox/md5.h>
 
 #include "common.h"
 #include "parse.h"
 #include "firmware.h"
 
-const char file_path[FILENAME_MAX] = "/tmp/firmware.bin";
+const char file_path[FILENAME_MAX] = "/tmp/sr_firmware.bin";
 
 static char *get_username_from_url(char *url)
 {
@@ -285,37 +290,55 @@ cleanup:
 int sysupgrade(ctx_t *ctx)
 {
     int rc = SR_ERR_OK;
-    pid_t pid, exec;
-    int status;
+    pid_t pid;
 
+    SET_MEM_STR(ctx->oper.message, "starting sysupgrade with ubus call");
     if ((pid = fork()) == 0) {
         signal(SIGHUP, SIG_IGN);
         setsid();
-        SET_MEM_STR(ctx->oper.status, "upgrade-in-progress");
-        if ((exec = fork()) == 0) {
-            if (ctx->firmware.preserve_configuration) {
-                execl("/sbin/sysupgrade", "sysupgrade", file_path, (char *) NULL);
-            } else {
-                execl("/sbin/sysupgrade", "sysupgrade", "-n", file_path, (char *) NULL);
-            }
-            exit(EXIT_SUCCESS);
+        struct blob_buf buf = {0};
+        struct json_object *p;
+        uint32_t id = 0;
+        int u_rc = 0;
+
+        struct ubus_context *u_ctx = ubus_connect(NULL);
+        if (u_ctx == NULL) {
+            ERR_MSG("Could not connect to ubus");
+            goto cleanup;
         }
 
-        if (exec > 0) {
-            if (waitpid(exec, &status, 0) > 0) {
-                if (WIFEXITED(status) && !WEXITSTATUS(status)) {
-                    SET_MEM_STR(ctx->oper.status, "upgrade-done");
-                } else if (WIFEXITED(status) && WEXITSTATUS(status)) {
-                    SET_MEM_STR(ctx->oper.status, "upgrade-failed");
-                } else {
-                    SET_MEM_STR(ctx->oper.status, "upgrade-failed");
-                }
-            } else {
-                SET_MEM_STR(ctx->oper.status, "upgrade-failed");
-            }
-            exit(EXIT_SUCCESS);
+        blob_buf_init(&buf, 0);
+        u_rc = ubus_lookup_id(u_ctx, "juci.sysupgrade", &id);
+        if (UBUS_STATUS_OK != u_rc) {
+            SET_MEM_STR(ctx->oper.message, "no object juci.sysupgrade");
+            ERR("ubus [%d]: no object juci.sysupgrade", u_rc);
+            goto cleanup;
         }
 
+        p = json_object_new_object();
+        json_object_object_add(p, "path", json_object_new_string(file_path));
+
+        if (ctx->firmware.preserve_configuration) {
+            json_object_object_add(p, "keep", json_object_new_int(1));
+        } else {
+            json_object_object_add(p, "keep", json_object_new_int(0));
+        }
+        const char *json_data = json_object_get_string(p);
+        blobmsg_add_json_from_string(&buf, json_data);
+        json_object_put(p);
+
+        u_rc = ubus_invoke(u_ctx, id, "start", buf.head, NULL, NULL, 0);
+        if (UBUS_STATUS_OK != u_rc) {
+            SET_MEM_STR(ctx->oper.message, "no object start");
+            ERR("ubus [%d]: no object start", u_rc);
+            goto cleanup;
+        }
+
+    cleanup:
+        if (NULL != u_ctx) {
+            ubus_free(u_ctx);
+            blob_buf_free(&buf);
+        }
         exit(EXIT_SUCCESS);
     }
 

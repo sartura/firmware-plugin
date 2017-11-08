@@ -43,3 +43,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME} ${CURL_LIBRARIES})
 find_package(OpenSSL REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} ${OPENSSL_LIBRARIES})
 include_directories(${OPENSSL_INCLUDE_DIR})
+
+TARGET_LINK_LIBRARIES(${CMAKE_PROJECT_NAME} json-c)
