@@ -285,28 +285,35 @@ cleanup:
 int sysupgrade(ctx_t *ctx)
 {
     int rc = SR_ERR_OK;
-    pid_t pid;
-    char command[128];
+    pid_t pid, exec;
+    int status;
 
     if ((pid = fork()) == 0) {
         signal(SIGHUP, SIG_IGN);
         setsid();
-        // run sysupgrade
         SET_MEM_STR(ctx->oper.status, "upgrade-in-progress");
-        if (ctx->firmware.preserve_configuration) {
-            snprintf(command, 128, "sysupgrade %s", file_path);
-        } else {
-            snprintf(command, 128, "sysupgrade -n %s", file_path);
+        if ((exec = fork()) == 0) {
+            if (ctx->firmware.preserve_configuration) {
+                execl("/sbin/sysupgrade", "sysupgrade", file_path, (char *) NULL);
+            } else {
+                execl("/sbin/sysupgrade", "sysupgrade", "-n", file_path, (char *) NULL);
+            }
+            exit(EXIT_SUCCESS);
         }
 
-        SET_MEM_STR(ctx->oper.message, "calling sysupgrade");
-        int ret = system(command);
-        SET_MEM_STR(ctx->oper.message, "called sysupgrade");
-        // int ret = system("true");
-        if (-1 == ret) {
-            SET_MEM_STR(ctx->oper.status, "upgrade-failed");
-        } else {
-            SET_MEM_STR(ctx->oper.status, "upgrade-done");
+        if (exec > 0) {
+            if (waitpid(exec, &status, 0) > 0) {
+                if (WIFEXITED(status) && !WEXITSTATUS(status)) {
+                    SET_MEM_STR(ctx->oper.status, "upgrade-done");
+                } else if (WIFEXITED(status) && WEXITSTATUS(status)) {
+                    SET_MEM_STR(ctx->oper.status, "upgrade-failed");
+                } else {
+                    SET_MEM_STR(ctx->oper.status, "upgrade-failed");
+                }
+            } else {
+                SET_MEM_STR(ctx->oper.status, "upgrade-failed");
+            }
+            exit(EXIT_SUCCESS);
         }
 
         exit(EXIT_SUCCESS);
