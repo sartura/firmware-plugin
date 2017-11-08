@@ -306,7 +306,7 @@ static int change_cb(sr_session_ctx_t *session, const char *xpath, sr_notif_even
     if (SR_EV_APPLY == event) {
         /* copy running datastore to startup */
 
-        rc = sr_copy_config(ctx->startup_sess, "ietf-system", SR_DS_RUNNING, SR_DS_STARTUP);
+        //rc = sr_copy_config(ctx->startup_sess, "ietf-system", SR_DS_RUNNING, SR_DS_STARTUP);
         if (SR_ERR_OK != rc) {
             WRN_MSG("Failed to copy running datastore to startup");
             /* TODO handle this error */

@@ -334,8 +334,6 @@ int sysupgrade(ctx_t *ctx)
             goto cleanup;
         }
 
-        sleep(10);
-
     cleanup:
         if (NULL != u_ctx) {
             ubus_free(u_ctx);
