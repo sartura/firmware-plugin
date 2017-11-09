@@ -300,8 +300,32 @@ cleanup:
 int sysupgrade(ctx_t *ctx)
 {
     int rc = SR_ERR_OK;
-    pid_t pid;
+    char result[128] = {0};
+    char command[128] = {0};
+    size_t pid;
+    FILE *file = NULL;
 
+    sprintf(command, "sysupgrade -T %s", file_path);
+
+    /* perform sysupgrade check */
+    file = popen(command, "r");
+    if (NULL == file) {
+        ERR("could not run command %s", command);
+    }
+
+    while (fgets(result, sizeof(result) - 1, file) != NULL) {
+    }
+    result[strlen(result) - 1] = '\0';
+
+    if (0 < strlen(result)) {
+        /* image check failed */
+        ERR("upgrade faild with message:%s", result);
+        SET_MEM_STR(ctx->oper.message, result);
+        SET_MEM_STR(ctx->oper.status, "upgrade-failed");
+        return rc;
+    }
+
+    SET_MEM_STR(ctx->oper.status, "upgrade-in-progress");
     SET_MEM_STR(ctx->oper.message, "starting sysupgrade with ubus call");
     if ((pid = fork()) == 0) {
         signal(SIGHUP, SIG_IGN);
@@ -343,6 +367,8 @@ int sysupgrade(ctx_t *ctx)
             ERR("ubus [%d]: no object start", u_rc);
             goto cleanup;
         }
+
+        SET_MEM_STR(ctx->oper.status, "upgrade-done");
 
     cleanup:
         if (NULL != u_ctx) {
