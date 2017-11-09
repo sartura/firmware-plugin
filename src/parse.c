@@ -252,9 +252,19 @@ int firmware_download(ctx_t *ctx)
         curl_ret = curl_easy_perform(curl);
         SET_MEM_STR(ctx->oper.message, "libcurl finished");
         if (CURLE_OK == curl_ret) {
-            INF_MSG("download-done");
-            SET_MEM_STR(ctx->oper.status, "download-done");
-            break;
+            long http_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+            if (http_code == 200 && curl_ret != CURLE_ABORTED_BY_CALLBACK) {
+                INF_MSG("download-done");
+                SET_MEM_STR(ctx->oper.status, "download-done");
+                break;
+            } else {
+                INF_MSG("dl-verification-failed");
+                SET_MEM_STR(ctx->oper.status, "dl-verification-failed");
+                char message[30] = {0};
+                sprintf(message, "libcurl returned error code %ld", http_code);
+                SET_MEM_STR(ctx->oper.message, message);
+            }
         }
         INF_MSG("downloading-failed");
         SET_MEM_STR(ctx->oper.status, "download-failed");
