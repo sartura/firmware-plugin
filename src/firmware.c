@@ -71,7 +71,7 @@ int load_startup_datastore(ctx_t *ctx)
     char *xpath = "/ietf-system:system/" YANG ":software/software//*";
 
     rc = sr_get_items(ctx->startup_sess, xpath, &values, &count);
-    if (SR_ERR_NOT_FOUND != rc) {
+    if (SR_ERR_NOT_FOUND == rc) {
         INF_MSG("empty startup datastore for firmware data");
         return SR_ERR_OK;
     } else if (SR_ERR_OK != rc) {
