@@ -47,6 +47,8 @@ int load_startup_datastore(ctx_t *ctx)
 {
     sr_conn_ctx_t *connection = NULL;
     sr_session_ctx_t *session = NULL;
+    sr_val_t *values = NULL;
+    size_t count = 0;
     int rc = SR_ERR_OK;
 
     /* connect to sysrepo */
@@ -61,34 +63,35 @@ int load_startup_datastore(ctx_t *ctx)
     ctx->startup_conn = connection;
 
     if (!can_restart(ctx)) {
+        INF_MSG("could not run a new sysupgrade process");
         return rc;
     }
 
     // load the startup firmware data into plugin
-    char *xpath = "/ietf-system:system/" YANG ":software//*";
-    sr_val_t *value = NULL;
-    sr_val_iter_t *iter = NULL;
+    char *xpath = "/ietf-system:system/" YANG ":software/software//*";
 
-    /* get all list instances with their content (recursive) */
-    rc = sr_get_items_iter(ctx->startup_sess, xpath, &iter);
+    rc = sr_get_items(ctx->startup_sess, xpath, &values, &count);
     if (SR_ERR_NOT_FOUND != rc) {
+        INF_MSG("empty startup datastore for firmware data");
         return SR_ERR_OK;
     } else if (SR_ERR_OK != rc) {
         goto cleanup;
     }
 
-    while (SR_ERR_OK == sr_get_item_next(ctx->startup_sess, iter, &value)) {
-        if (0 == strncmp(value->xpath, xpath_system_software, strlen(xpath_system_software))) {
-            rc = update_firmware(ctx, value);
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if (0 == strncmp(values[i].xpath, xpath_system_software, strlen(xpath_system_software))) {
+            rc = update_firmware(ctx, &values[i]);
             CHECK_RET(rc, cleanup, "failed to update firmware: %s", sr_strerror(rc));
-        } else if (0 == strncmp(value->xpath, xpath_download_policy, strlen(xpath_download_policy))) {
-            rc = update_firmware(ctx, value);
+        } else if (0 == strncmp(values[i].xpath, xpath_download_policy, strlen(xpath_download_policy))) {
+            rc = update_firmware(ctx, &values[i]);
             CHECK_RET(rc, cleanup, "failed to update firmware: %s", sr_strerror(rc));
         }
-        sr_print_val(value);
-        sr_free_val(value);
+        sr_print_val(&values[i]);
     }
-    sr_free_val_iter(iter);
+    if (NULL != values && 0 < count) {
+        sr_free_values(values, count);
+    }
 
     (void) signal(SIGUSR1, sig_handler);
     sysupgrade_pid = fork();
@@ -115,8 +118,8 @@ int load_startup_datastore(ctx_t *ctx)
 
     return rc;
 cleanup:
-    if (NULL != iter) {
-        sr_free_val_iter(iter);
+    if (NULL != values && 0 < count) {
+        sr_free_values(values, count);
     }
     if (NULL != session) {
         sr_session_stop(session);
