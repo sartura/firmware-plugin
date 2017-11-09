@@ -22,6 +22,21 @@ static int update_firmware(ctx_t *, sr_val_t *);
 static const char *xpath_download_policy = "/ietf-system:system/" YANG ":software/download-policy";
 static const char *xpath_system_software = "/ietf-system:system/" YANG ":software/software";
 
+bool can_restart(ctx_t *ctx)
+{
+    if( access("/var/sysupgrade.lock", F_OK ) != -1 ) {
+        return false;
+	}
+
+    if (0 == strcmp(ctx->oper.status, "upgrade-in-progress")) {
+        return false;
+    } else if (0 == strcmp(ctx->oper.status, "upgrade-done")) {
+        return false;
+    }
+
+    return true;
+}
+
 void sig_handler(int signum)
 {
     INF_MSG("kill chdild process");
@@ -250,6 +265,23 @@ static int parse_change(sr_session_ctx_t *session, const char *xpath, ctx_t *ctx
         }
         sr_free_val(old_value);
         sr_free_val(new_value);
+    }
+
+    // creat fork if it doesn't exist, if yes close it and create a new one
+    if (software_changed || software_deleted) {
+        if (0 < sysupgrade_pid) {
+            if (can_restart(ctx)) {
+                INF_MSG("\nkill old sysupgrade process\n");
+                if (sysupgrade_pid > 0) {
+                    kill(sysupgrade_pid, SIGUSR1);
+                }
+                sysupgrade_pid = 0;
+            } else {
+                /* don't accept the changes */
+                rc = SR_ERR_INTERNAL;
+                goto error;
+            }
+        }
     }
 
     // creat fork if it doesn't exist, if yes close it and create a new one
@@ -602,9 +634,10 @@ void sr_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_ctx)
     clean_configuration_data(&ctx->firmware);
     clean_operational_data(&ctx->oper);
 
-    if (0 < sysupgrade_pid) {
+    if (can_restart(ctx) && sysupgrade_pid > 0) {
         INF_MSG("kill background sysupgrade process");
-        //kill(sysupgrade_pid, SIGUSR1);
+        INF("kill pid %d", sysupgrade_pid);
+        kill(sysupgrade_pid, SIGUSR1);
     }
 
     free(ctx);
