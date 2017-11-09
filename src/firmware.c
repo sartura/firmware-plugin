@@ -60,6 +60,11 @@ int load_startup_datastore(ctx_t *ctx)
     ctx->startup_sess = session;
     ctx->startup_conn = connection;
 
+    sleep(2);
+    if (!can_restart(ctx)) {
+        return rc;
+    }
+
     // load the startup firmware data into plugin
     char *xpath = "/ietf-system:system/" YANG ":software//*";
     sr_val_t *value = NULL;
@@ -67,7 +72,9 @@ int load_startup_datastore(ctx_t *ctx)
 
     /* get all list instances with their content (recursive) */
     rc = sr_get_items_iter(ctx->startup_sess, xpath, &iter);
-    if (SR_ERR_OK != rc) {
+    if (SR_ERR_NOT_FOUND != rc) {
+        return SR_ERR_OK;
+    } else if (SR_ERR_OK != rc) {
         goto cleanup;
     }
 
@@ -121,6 +128,7 @@ cleanup:
 
     return rc;
 }
+
 static int update_firmware(ctx_t *ctx, sr_val_t *value)
 {
     int rc = SR_ERR_OK;
