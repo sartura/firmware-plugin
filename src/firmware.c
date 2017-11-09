@@ -60,7 +60,6 @@ int load_startup_datastore(ctx_t *ctx)
     ctx->startup_sess = session;
     ctx->startup_conn = connection;
 
-    sleep(2);
     if (!can_restart(ctx)) {
         return rc;
     }
@@ -107,7 +106,7 @@ int load_startup_datastore(ctx_t *ctx)
                 break;
             } else {
                 INF_MSG("failed to install firmware");
-                exit(EXIT_SUCCESS);
+                exit(EXIT_FAILURE);
             }
         }
         INF_MSG("exit child process");
@@ -280,24 +279,13 @@ static int parse_change(sr_session_ctx_t *session, const char *xpath, ctx_t *ctx
         if (0 < sysupgrade_pid) {
             if (can_restart(ctx)) {
                 INF_MSG("\nkill old sysupgrade process\n");
-                if (sysupgrade_pid > 0) {
-                    kill(sysupgrade_pid, SIGUSR1);
-                }
+                kill(sysupgrade_pid, SIGUSR1);
                 sysupgrade_pid = 0;
             } else {
                 /* don't accept the changes */
                 rc = SR_ERR_INTERNAL;
                 goto error;
             }
-        }
-    }
-
-    // creat fork if it doesn't exist, if yes close it and create a new one
-    if (software_changed || software_deleted) {
-        if (0 < sysupgrade_pid) {
-            INF_MSG("\nkill old sysupgrade process\n");
-            kill(sysupgrade_pid, SIGUSR1);
-            sysupgrade_pid = -1;
         }
     }
 
@@ -564,7 +552,7 @@ cleanup:
 int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
 {
     int rc = SR_ERR_OK;
-    sysupgrade_pid = -1;
+    sysupgrade_pid = 0;
 
     /* INF("sr_plugin_init_cb for sysrepo-plugin-dt-network"); */
 
