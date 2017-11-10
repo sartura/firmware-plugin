@@ -152,7 +152,7 @@ static int update_firmware(ctx_t *ctx, sr_val_t *value)
     } else if (0 == strncmp(node, "ssh-key", strlen(node)) && SR_STRING_T == value->type) {
         ctx->firmware.credentials.type = CRED_SSH_KEY;
         SET_STR(ctx->firmware.credentials.val, value->data.string_val);
-    } else if (0 == strncmp(node, "preserve-configuration", strlen(node)) && SR_STRING_T == value->type) {
+    } else if (0 == strncmp(node, "preserve-configuration", strlen(node)) && SR_BOOL_T == value->type) {
         ctx->firmware.preserve_configuration = value->data.bool_val;
     } else if (0 == strncmp(node, "type", strlen(node)) && SR_ENUM_T == value->type) {
         const char *type = value->data.string_val;
