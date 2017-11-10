@@ -353,9 +353,9 @@ int sysupgrade(ctx_t *ctx)
         json_object_object_add(p, "path", json_object_new_string(file_path));
 
         if (ctx->firmware.preserve_configuration) {
-            json_object_object_add(p, "keep", json_object_new_int(1));
+            json_object_object_add(p, "keep", json_object_new_string("1"));
         } else {
-            json_object_object_add(p, "keep", json_object_new_int(0));
+            json_object_object_add(p, "keep", json_object_new_string("0"));
         }
         const char *json_data = json_object_get_string(p);
         blobmsg_add_json_from_string(&buf, json_data);
