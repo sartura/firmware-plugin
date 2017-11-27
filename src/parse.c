@@ -24,6 +24,61 @@
 
 const char file_path[FILENAME_MAX] = "/tmp/sr_firmware.bin";
 
+/* copy startup datatsore file to /etc/sysrepo/sysupgrade */
+static int copy_file()
+{
+	char *src = "/etc/sysrepo/ietf-system.startup";
+	char *dest = "/etc/sysrepo/sysupgrade/ietf-system.startup";
+    int fd_dest, fd_src;
+    char buf[4096];
+    ssize_t nread;
+
+    fd_src = open(src, O_RDONLY);
+    if (fd_src < 0) {
+        return -1;
+	}
+
+    fd_dest = open(dest, O_WRONLY | O_CREAT | O_EXCL, 0666);
+    if (fd_dest < 0) {
+        goto out_error;
+	}
+
+    while (nread = read(fd_src, buf, sizeof buf), nread > 0) {
+        char *out_ptr = buf;
+        ssize_t nwritten;
+
+        do {
+            nwritten = write(fd_dest, out_ptr, nread);
+
+            if (nwritten >= 0) {
+                nread -= nwritten;
+                out_ptr += nwritten;
+            } else if (errno != EINTR) {
+                goto out_error;
+            }
+        } while (nread > 0);
+    }
+
+    if (nread == 0) {
+        if (close(fd_dest) < 0) {
+            fd_dest = -1;
+            goto out_error;
+        }
+        close(fd_src);
+
+        /* Success! */
+        return 0;
+    }
+
+out_error:
+    close(fd_src);
+    if (fd_dest >= 0) {
+        close(fd_dest);
+	}
+
+    return -1;
+}
+
 static char *get_username_from_url(char *url)
 {
     char *res = malloc(sizeof(char) * strlen(url));
@@ -360,6 +415,8 @@ int sysupgrade(ctx_t *ctx)
         const char *json_data = json_object_get_string(p);
         blobmsg_add_json_from_string(&buf, json_data);
         json_object_put(p);
+
+        copy_file();
 
         u_rc = ubus_invoke(u_ctx, id, "start", buf.head, NULL, NULL, 0);
         if (UBUS_STATUS_OK != u_rc) {
