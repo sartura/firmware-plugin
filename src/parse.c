@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <json-c/json.h>
 #include <libubus.h>
@@ -409,6 +411,13 @@ int sysupgrade(ctx_t *ctx)
 
         if (ctx->firmware.preserve_configuration) {
             json_object_object_add(p, "keep", json_object_new_string("1"));
+            /* if /etc/sysrepo/sysupgrade does not exist, create it */
+            const char *dir = "/etc/sysrepo/sysupgrade";
+            struct stat st = {0};
+
+            if (stat(dir, &st) == -1) {
+                mkdir(dir, 0700);
+            }
             copy_file();
         } else {
             json_object_object_add(p, "keep", json_object_new_string("0"));
