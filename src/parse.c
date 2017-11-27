@@ -27,7 +27,7 @@ const char file_path[FILENAME_MAX] = "/tmp/sr_firmware.bin";
 /* copy startup datatsore file to /etc/sysrepo/sysupgrade */
 static int copy_file()
 {
-	char *src = "/etc/sysrepo/ietf-system.startup";
+	char *src = "/etc/sysrepo/data/ietf-system.startup";
 	char *dest = "/etc/sysrepo/sysupgrade/ietf-system.startup";
     int fd_dest, fd_src;
     char buf[4096];
@@ -409,14 +409,13 @@ int sysupgrade(ctx_t *ctx)
 
         if (ctx->firmware.preserve_configuration) {
             json_object_object_add(p, "keep", json_object_new_string("1"));
+            copy_file();
         } else {
             json_object_object_add(p, "keep", json_object_new_string("0"));
         }
         const char *json_data = json_object_get_string(p);
         blobmsg_add_json_from_string(&buf, json_data);
         json_object_put(p);
-
-        copy_file();
 
         u_rc = ubus_invoke(u_ctx, id, "start", buf.head, NULL, NULL, 0);
         if (UBUS_STATUS_OK != u_rc) {
