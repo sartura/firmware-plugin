@@ -184,6 +184,10 @@ EXPOSE 830
 COPY juci.system /usr/libexec/rpcd/juci.system
 RUN chmod +x /usr/libexec/rpcd/juci.system
 
+# ubus call juci.sysupgrade
+COPY juci.sysupgrade /usr/libexec/rpcd/juci.sysupgrade
+RUN chmod +x /usr/libexec/rpcd/juci.sysupgrade
+
 # serial number
 RUN mkdir -p /opt/proc/nvram
 RUN echo "EG4024H171036684\n" > /opt/proc/nvram/SerialNumber
@@ -193,6 +197,13 @@ RUN \
       mkdir -p /opt/command && \
       echo "#!/bin/sh\necho 'EG400-WU21U_PANTERA-DEV3.12.0-171103_1128'" > /opt/command/db && \
       chmod u+x /opt/command/db && \
+      . ~/.profile
+ENV PATH="/opt/command:${PATH}"
+
+# add command sysupgrade
+RUN \
+      echo "#!/bin/sh\nreturn 0" > /opt/command/sysupgrade && \
+      chmod u+x /opt/command/sysupgrade && \
       . ~/.profile
 ENV PATH="/opt/command:${PATH}"
 
