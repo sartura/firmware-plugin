@@ -82,58 +82,66 @@ cleanup:
 }
 
 /* copy startup datatsore file to /etc/sysrepo/sysupgrade */
-static int copy_file()
+static void generate_startup_data(firmware_t *firmware)
 {
-	char *src = "/etc/sysrepo/data/ietf-system.startup";
-	char *dest = "/etc/sysrepo/sysupgrade/ietf-system.startup";
-    int fd_dest, fd_src;
-    char buf[4096];
-    ssize_t nread;
+    char *filename = "/etc/sysrepo/sysupgrade/ietf-system.startup";
+    FILE *file = NULL;
 
-    fd_src = open(src, O_RDONLY);
-    if (fd_src < 0) {
-        return -1;
-	}
-
-    fd_dest = open(dest, O_WRONLY | O_CREAT | O_EXCL, 0666);
-    if (fd_dest < 0) {
+    file = fopen(filename, "w+b");
+    if (NULL == file) {
         goto out_error;
-	}
-
-    while (nread = read(fd_src, buf, sizeof buf), nread > 0) {
-        char *out_ptr = buf;
-        ssize_t nwritten;
-
-        do {
-            nwritten = write(fd_dest, out_ptr, nread);
-
-            if (nwritten >= 0) {
-                nread -= nwritten;
-                out_ptr += nwritten;
-            } else if (errno != EINTR) {
-                goto out_error;
-            }
-        } while (nread > 0);
     }
 
-    if (nread == 0) {
-        if (close(fd_dest) < 0) {
-            fd_dest = -1;
-            goto out_error;
+    fprintf(file, "<system xmlns=\"urn:ietf:params:xml:ns:yang:ietf-system\">\n");
+    fprintf(file, "  <software xmlns=\"http://terastrm.net/ns/yang/" YANG "\">\n");
+    fprintf(file, "    <software>\n");
+    fprintf(file, "      <name>%s</name>\n", firmware->name);
+    if (NULL != firmware->source.uri) {
+        fprintf(file, "      <source>%s</source>\n", firmware->source.uri);
+    }
+    if (NULL != firmware->credentials.val) {
+        fprintf(file, "      <password>\n");
+        fprintf(file, "        <password>%s</password>\n", firmware->credentials.val);
+        fprintf(file, "      </password>\n");
+    }
+    if (NULL != firmware->cksum.val) {
+        fprintf(file, "      <checksum>\n");
+        switch (firmware->cksum.type) {
+            case CKSUM_MD5:
+                fprintf(file, "        <type>%s</type>\n", "md5");
+                break;
+            case CKSUM_SHA1:
+                fprintf(file, "        <type>%s</type>\n", "sha-1");
+                break;
+            case CKSUM_SHA2:
+                fprintf(file, "        <type>%s</type>\n", "sha-2");
+                break;
+            case CKSUM_SHA3:
+                fprintf(file, "        <type>%s</type>\n", "sha-3");
+                break;
+            case CKSUM_SHA256:
+                fprintf(file, "        <type>%s</type>\n", "sha-256");
+                break;
         }
-        close(fd_src);
-
-        /* Success! */
-        return 0;
+        fprintf(file, "        <value>%s</value>\n", firmware->cksum.val);
+        fprintf(file, "      </checksum>\n");
     }
+    if (true == firmware->preserve_configuration) {
+        fprintf(file, "      <preserve-configuration>true</preserve-configuration>\n");
+    } else {
+        fprintf(file, "      <preserve-configuration>false</preserve-configuration>\n");
+    }
+
+    fprintf(file, "    </software>\n");
+    fprintf(file, "  </software>\n");
+    fprintf(file, "</system>\n");
 
 out_error:
-    close(fd_src);
-    if (fd_dest >= 0) {
-        close(fd_dest);
-	}
+    if (NULL != file) {
+        fclose(file);
+    }
 
-    return -1;
+    return;
 }
 
 static char *get_username_from_url(char *url)
@@ -473,7 +481,7 @@ int sysupgrade(ctx_t *ctx)
             if (stat(dir, &st) == -1) {
                 mkdir(dir, 0700);
             }
-            copy_file();
+            generate_startup_data(&ctx->firmware);
             update_checksum(&ctx->firmware);
         } else {
             json_object_object_add(p, "keep", json_object_new_string("0"));
