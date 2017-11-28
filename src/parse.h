@@ -24,6 +24,7 @@
 
 #include "firmware.h"
 
+bool compare_checksum(firmware_t *);
 int load_startup_datastore(ctx_t *);
 int firmware_download(ctx_t *);
 int sysupgrade(ctx_t *);

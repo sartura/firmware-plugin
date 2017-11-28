@@ -26,6 +26,61 @@
 
 const char file_path[FILENAME_MAX] = "/tmp/sr_firmware.bin";
 
+/* update checksum */
+bool compare_checksum(firmware_t *firmware)
+{
+    const char *filename = "/etc/sysrepo/sysupgrade/cksum";
+    bool equal = false;
+    size_t max_buf_len = 64;
+
+    char source[max_buf_len + 1];
+    FILE *file = fopen(filename, "r");
+    if (NULL == file) {
+        ERR_MSG("fopen returned NULL");
+        goto cleanup;
+    }
+
+    size_t newLen = fread(source, sizeof(char), max_buf_len, file);
+    if (ferror(file) != 0) {
+        ERR_MSG("error reading file");
+        goto cleanup;
+    }
+
+    source[newLen++] = '\0';
+    if (0 == strncmp(firmware->cksum.val, source, strlen(firmware->cksum.val))) {
+        equal = true;
+    }
+
+cleanup:
+    if (NULL != file) {
+        fclose(file);
+    }
+
+    return equal;
+}
+
+/* update checksum */
+static int update_checksum(firmware_t *firmware)
+{
+    FILE *file;
+    int rc = SR_ERR_OK;
+    const char *filename = "/etc/sysrepo/sysupgrade/cksum";
+
+    file = fopen(filename, "w+b");
+    CHECK_NULL_MSG(file, &rc, cleanup, "fopen returned NULL");
+
+    char *cksum = firmware->cksum.val;
+
+    fprintf(file, "%s", cksum);
+
+cleanup:
+    if (NULL != file) {
+        fclose(file);
+    }
+
+    return rc;
+}
+
 /* copy startup datatsore file to /etc/sysrepo/sysupgrade */
 static int copy_file()
 {
@@ -419,6 +474,7 @@ int sysupgrade(ctx_t *ctx)
                 mkdir(dir, 0700);
             }
             copy_file();
+            update_checksum(&ctx->firmware);
         } else {
             json_object_object_add(p, "keep", json_object_new_string("0"));
         }

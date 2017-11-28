@@ -277,6 +277,11 @@ static int parse_change(sr_session_ctx_t *session, const char *xpath, ctx_t *ctx
         sr_free_val(new_value);
     }
 
+    if (true == compare_checksum(&ctx->firmware)) {
+        INF_MSG("the firmawer has the same checksum as the installed one");
+        goto error;
+    }
+
     // creat fork if it doesn't exist, if yes close it and create a new one
     if (software_changed || software_deleted) {
         if (0 < sysupgrade_pid) {
