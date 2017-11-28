@@ -94,8 +94,9 @@ int load_startup_datastore(ctx_t *ctx)
     }
 
     if (true == compare_checksum(&ctx->firmware)) {
-        INF_MSG("the firmawer has the same checksum as the installed one");
-        goto cleanup;
+        INF_MSG("the firmware has the same checksum as the installed one");
+        INF_MSG("don't perform sysupgrade");
+        return rc;
     }
 
     (void) signal(SIGUSR1, sig_handler);
@@ -283,7 +284,8 @@ static int parse_change(sr_session_ctx_t *session, const char *xpath, ctx_t *ctx
     }
 
     if (true == compare_checksum(&ctx->firmware)) {
-        INF_MSG("the firmawer has the same checksum as the installed one");
+        INF_MSG("the firmware has the same checksum as the installed one");
+        INF_MSG("don't perform sysupgrade");
         goto error;
     }
 
