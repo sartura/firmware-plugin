@@ -93,6 +93,11 @@ int load_startup_datastore(ctx_t *ctx)
         sr_free_values(values, count);
     }
 
+    if (true == compare_checksum(&ctx->firmware)) {
+        INF_MSG("the firmawer has the same checksum as the installed one");
+        goto cleanup;
+    }
+
     (void) signal(SIGUSR1, sig_handler);
     sysupgrade_pid = fork();
     INF("sysupgrade_pid %d", sysupgrade_pid);
