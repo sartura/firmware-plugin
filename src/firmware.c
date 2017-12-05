@@ -293,8 +293,8 @@ static int parse_change(sr_session_ctx_t *session, const char *xpath, ctx_t *ctx
     if (software_changed || software_deleted) {
         if (0 < sysupgrade_pid) {
             if (can_restart(ctx)) {
-                INF_MSG("\nkill old sysupgrade process\n");
-                kill(sysupgrade_pid, SIGUSR1);
+                INF_MSG("kill old sysupgrade process");
+                kill(sysupgrade_pid, SIGKILL);
                 sysupgrade_pid = 0;
             } else {
                 /* don't accept the changes */
@@ -648,7 +648,8 @@ void sr_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_ctx)
     if (can_restart(ctx) && sysupgrade_pid > 0) {
         INF_MSG("kill background sysupgrade process");
         INF("kill pid %d", sysupgrade_pid);
-        kill(sysupgrade_pid, SIGUSR1);
+        kill(sysupgrade_pid, SIGKILL);
+        sysupgrade_pid = 0;
     }
 
     free(ctx);
