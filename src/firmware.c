@@ -371,8 +371,8 @@ static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *valu
     ctx_t *ctx = private_ctx;
     int counter = 0;
     char *xpath_base = "/ietf-system:system-state/" YANG ":software";
-    char xpath_list[XPATH_MAX_LEN] = {0};
-    char xpath[XPATH_MAX_LEN] = {0};
+    char *xpath_list = NULL;
+    char *xpath = NULL;
 
     if (NULL == ctx->oper.name)
         return SR_ERR_OK;
@@ -380,36 +380,42 @@ static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *valu
         counter++;
     if (NULL != ctx->oper.version)
         counter++;
-    if (NULL != ctx->oper.message)
+    if (NULL != ctx->oper.message && 0 < strlen(ctx->oper.message))
         counter++;
-    if (NULL != ctx->oper.status)
+    if (NULL != ctx->oper.status && 0 < strlen(ctx->oper.status))
         counter++;
 
     *values_cnt = counter;
     rc = sr_new_values(*values_cnt, values);
+    CHECK_RET(rc, error, "failed sr_new_values: %s", sr_strerror(rc));
 
     counter = 0;
-    sprintf(xpath_list, "%s[name='%s']", xpath_base, ctx->oper.name);
+
+    int xpath_len = strlen(ctx->oper.name) + strlen(ctx->oper.uri) + XPATH_MAX_LEN;
+    xpath_list = (char *) malloc(sizeof(char) * xpath_len);
+    xpath = (char *) malloc(sizeof(char) * xpath_len);
+
+    snprintf(xpath_list, xpath_len, "%s[name='%s']", xpath_base, ctx->oper.name);
     if (ctx->oper.uri) {
-        sprintf(xpath, "%s/%s", xpath_list, "source");
+        snprintf(xpath, xpath_len, "%s/%s", xpath_list, "source");
         sr_val_set_xpath(&(*values)[counter], xpath);
         sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->oper.uri);
         counter++;
     }
     if (ctx->oper.version) {
-        sprintf(xpath, "%s/%s", xpath_list, "version");
+        snprintf(xpath, xpath_len, "%s/%s", xpath_list, "version");
         sr_val_set_xpath(&(*values)[counter], xpath);
         sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->oper.version);
         counter++;
     }
-    if (ctx->oper.status) {
-        sprintf(xpath, "%s/%s", xpath_list, "status");
+    if (ctx->oper.status && 0 < strlen(ctx->oper.status)) {
+        snprintf(xpath, xpath_len, "%s/%s", xpath_list, "status");
         sr_val_set_xpath(&(*values)[counter], xpath);
         sr_val_set_str_data(&(*values)[counter], SR_ENUM_T, (char *) ctx->oper.status);
         counter++;
     }
-    if (ctx->oper.message) {
-        sprintf(xpath, "%s/%s", xpath_list, "message");
+    if (ctx->oper.message && 0 < strlen(ctx->oper.message)) {
+        snprintf(xpath, xpath_len, "%s/%s", xpath_list, "message");
         sr_val_set_xpath(&(*values)[counter], xpath);
         sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->oper.message);
         counter++;
@@ -422,6 +428,13 @@ static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *valu
         }
     }
 
+error:
+    if (NULL != xpath) {
+        free(xpath);
+    }
+    if (NULL != xpath_list) {
+        free(xpath_list);
+    }
     return rc;
 }
 
