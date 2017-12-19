@@ -89,9 +89,8 @@ RUN \
 # keystore
 RUN \
       cd /opt/dev && \
-      git clone https://github.com/sartura/Netopeer2.git && \
+      git clone https://github.com/CESNET/Netopeer2.git && \
       cd Netopeer2 && \
-      git checkout iter_fix_master && \
       cd keystored && mkdir build && cd build && \
       cmake -DCMAKE_BUILD_TYPE:String="Release" .. && \
       make -j2 && \
@@ -108,7 +107,7 @@ RUN \
       cd ../../cli && mkdir build && cd build && \
       cmake -DCMAKE_BUILD_TYPE:String="Release" .. && \
       make -j2 && \
-      make install 
+      make install
 
 RUN \
       apt-get update && apt-get install -y \
