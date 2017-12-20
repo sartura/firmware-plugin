@@ -199,12 +199,5 @@ RUN \
       . ~/.profile
 ENV PATH="/opt/command:${PATH}"
 
-# add command sysupgrade
-RUN \
-      echo "#!/bin/sh\nreturn 0" > /opt/command/sysupgrade && \
-      chmod u+x /opt/command/sysupgrade && \
-      . ~/.profile
-ENV PATH="/opt/command:${PATH}"
-
 COPY supervisord.conf /etc/supervisord.conf
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

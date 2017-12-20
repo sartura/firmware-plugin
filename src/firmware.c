@@ -26,7 +26,7 @@ bool can_restart(ctx_t *ctx)
 {
     if( access("/var/sysupgrade.lock", F_OK ) != -1 ) {
         return false;
-	}
+    }
 
     if (0 == strcmp(ctx->oper.status, "upgrade-in-progress")) {
         return false;
@@ -503,76 +503,103 @@ error:
 static int
 rpc_firstboot_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
 {
-    INF_MSG("rpc callback rpc_firstboot_cb has been called");
-    struct blob_buf buf = {0};
-    uint32_t id = 0;
-    int u_rc = 0;
+    (void) signal(SIGUSR1, sig_handler);
+    size_t rpcd_pid = fork();
 
-    struct ubus_context *u_ctx = ubus_connect(NULL);
-    if (u_ctx == NULL) {
-        ERR_MSG("Could not connect to ubus");
-        goto cleanup;
-    }
-
-    blob_buf_init(&buf, 0);
-    u_rc = ubus_lookup_id(u_ctx, "juci.system", &id);
-    if (UBUS_STATUS_OK != u_rc) {
-        ERR("ubus [%d]: no object juci.system", u_rc);
-        goto cleanup;
-    }
-
-    u_rc = ubus_invoke(u_ctx, id, "defaultreset", buf.head, NULL, NULL, 0);
-    if (UBUS_STATUS_OK != u_rc) {
-        ERR("ubus [%d]: no object defaultreset", u_rc);
-        goto cleanup;
-    }
-
-cleanup:
-    if (NULL != u_ctx) {
-        ubus_free(u_ctx);
-        blob_buf_free(&buf);
-    }
-
-    if (UBUS_STATUS_OK != u_rc) {
+    INF("rpcd_pid %d", rpcd_pid);
+    if (-1 == sysupgrade_pid) {
+        ERR_MSG("failed to fork()");
         return SR_ERR_INTERNAL;
+    } else if (0 == rpcd_pid) {
+        /* wait for sysrepo/netopeer2 to finish the RPC call */
+        sleep(3);
+
+        INF_MSG("rpc callback rpc_firstboot_cb has been called");
+        struct blob_buf buf = {0};
+        uint32_t id = 0;
+        int u_rc = 0;
+
+        struct ubus_context *u_ctx = ubus_connect(NULL);
+        if (u_ctx == NULL) {
+            ERR_MSG("Could not connect to ubus");
+            goto cleanup;
+        }
+
+        blob_buf_init(&buf, 0);
+        u_rc = ubus_lookup_id(u_ctx, "juci.system", &id);
+        if (UBUS_STATUS_OK != u_rc) {
+            ERR("ubus [%d]: no object juci.system", u_rc);
+            goto cleanup;
+        }
+
+        u_rc = ubus_invoke(u_ctx, id, "defaultreset", buf.head, NULL, NULL, 0);
+        if (UBUS_STATUS_OK != u_rc) {
+            ERR("ubus [%d]: no object defaultreset", u_rc);
+            goto cleanup;
+        }
+
+    cleanup:
+        if (NULL != u_ctx) {
+            ubus_free(u_ctx);
+            blob_buf_free(&buf);
+        }
+
+        if (UBUS_STATUS_OK != u_rc) {
+            return SR_ERR_INTERNAL;
+        }
+        exit(EXIT_SUCCESS);
     }
+
     return SR_ERR_OK;
 }
 
 static int rpc_reboot_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
 {
-    INF_MSG("rpc callback rpc_reboot_cb has been called");
-    struct blob_buf buf = {0};
-    uint32_t id = 0;
-    int u_rc = 0;
+    (void) signal(SIGUSR1, sig_handler);
+    size_t rpcd_pid = fork();
 
-    struct ubus_context *u_ctx = ubus_connect(NULL);
-    if (u_ctx == NULL) {
-        ERR_MSG("Could not connect to ubus");
-        goto cleanup;
-    }
-
-    blob_buf_init(&buf, 0);
-    u_rc = ubus_lookup_id(u_ctx, "juci.system", &id);
-    if (UBUS_STATUS_OK != u_rc) {
-        ERR("ubus [%d]: no object juci.system", u_rc);
-        goto cleanup;
-    }
-
-    u_rc = ubus_invoke(u_ctx, id, "reboot", buf.head, NULL, NULL, 0);
-    if (UBUS_STATUS_OK != u_rc) {
-        ERR("ubus [%d]: no object reboot", u_rc);
-        goto cleanup;
-    }
-
-cleanup:
-    if (NULL != u_ctx) {
-        ubus_free(u_ctx);
-        blob_buf_free(&buf);
-    }
-
-    if (UBUS_STATUS_OK != u_rc) {
+    INF("rpcd_pid %d", rpcd_pid);
+    if (-1 == sysupgrade_pid) {
+        ERR_MSG("failed to fork()");
         return SR_ERR_INTERNAL;
+    } else if (0 == rpcd_pid) {
+        /* wait for sysrepo/netopeer2 to finish the RPC call */
+        sleep(3);
+
+        INF_MSG("rpc callback rpc_reboot_cb has been called");
+        struct blob_buf buf = {0};
+        uint32_t id = 0;
+        int u_rc = 0;
+
+        struct ubus_context *u_ctx = ubus_connect(NULL);
+        if (u_ctx == NULL) {
+            ERR_MSG("Could not connect to ubus");
+            goto cleanup;
+        }
+
+        blob_buf_init(&buf, 0);
+        u_rc = ubus_lookup_id(u_ctx, "juci.system", &id);
+        if (UBUS_STATUS_OK != u_rc) {
+            ERR("ubus [%d]: no object juci.system", u_rc);
+            goto cleanup;
+        }
+
+        u_rc = ubus_invoke(u_ctx, id, "reboot", buf.head, NULL, NULL, 0);
+        if (UBUS_STATUS_OK != u_rc) {
+            ERR("ubus [%d]: no object reboot", u_rc);
+            goto cleanup;
+        }
+
+    cleanup:
+        if (NULL != u_ctx) {
+            ubus_free(u_ctx);
+            blob_buf_free(&buf);
+        }
+
+        if (UBUS_STATUS_OK != u_rc) {
+            return SR_ERR_INTERNAL;
+        }
+        exit(EXIT_SUCCESS);
     }
     return SR_ERR_OK;
 }
