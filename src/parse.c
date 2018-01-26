@@ -81,6 +81,42 @@ cleanup:
     return rc;
 }
 
+int copy_file(char *src_path, char *dst_path)
+{
+
+    int src_fd, dst_fd, n, err;
+    unsigned char buffer[4096];
+
+    src_fd = open(src_path, O_RDONLY);
+    dst_fd = open(dst_path, O_CREAT | O_WRONLY);
+
+    while (1) {
+        err = read(src_fd, buffer, 4096);
+        if (err == -1) {
+            goto error;
+        }
+        n = err;
+
+        if (n == 0)
+            break;
+
+        err = write(dst_fd, buffer, n);
+        if (err == -1) {
+            goto error;
+        }
+    }
+
+    close(src_fd);
+    close(dst_fd);
+
+    return 0;
+error:
+    ERR("failed to copy file %s to %s", src_path, dst_path);
+    close(src_fd);
+    close(dst_fd);
+    return 1;
+}
+
 /* copy startup datatsore file to /etc/sysrepo/sysupgrade */
 static void generate_startup_data(firmware_t *firmware)
 {
@@ -140,6 +176,11 @@ out_error:
     if (NULL != file) {
         fclose(file);
     }
+
+    /* save ietf-keystore config file */
+    char *src_path = "/etc/sysrepo/data/ietf-keystore.startup";
+    char *dst_path = "/etc/sysrepo/sysupgrade/ietf-keystore.startup";
+    copy_file(src_path, dst_path);
 
     return;
 }
