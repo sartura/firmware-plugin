@@ -1,5 +1,5 @@
-module terastream-software-hack {
-  namespace "http://terastrm.net/ns/yang/terastream-software-hack";
+module terastream-software {
+  namespace "http://terastrm.net/ns/yang/terastream-software";
 
   prefix "ts-swh";
 
@@ -205,13 +205,8 @@ module terastream-software-hack {
         description
           "Information about the system software.";
 
-        key name;
+        key source;
         max-elements 1;
-
-        leaf name {
-          description "temporary leaf for key value";
-          type string;
-        }
 
         leaf source {
           type inet:uri;
@@ -317,13 +312,8 @@ module terastream-software-hack {
     list software {
         description "State related to system software";
 
-        key name;
+        key source;
         max-elements 1;
-
-        leaf name {
-          description "temporary leaf for key value";
-          type string;
-        }
 
         leaf source {
           description

@@ -131,7 +131,6 @@ static void generate_startup_data(firmware_t *firmware)
     fprintf(file, "<system xmlns=\"urn:ietf:params:xml:ns:yang:ietf-system\">\n");
     fprintf(file, "  <software xmlns=\"http://terastrm.net/ns/yang/" YANG "\">\n");
     fprintf(file, "    <software>\n");
-    fprintf(file, "      <name>%s</name>\n", firmware->name);
     if (NULL != firmware->source.uri) {
         fprintf(file, "      <source>%s</source>\n", firmware->source.uri);
     }

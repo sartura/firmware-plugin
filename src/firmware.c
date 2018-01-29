@@ -146,9 +146,6 @@ static int update_firmware(ctx_t *ctx, sr_val_t *value)
     if (0 == strncmp(node, "source", strlen(node)) && SR_STRING_T == value->type) {
         SET_STR(ctx->firmware.source.uri, value->data.string_val);
         SET_STR(ctx->oper.uri, ctx->firmware.source.uri);
-    } else if (0 == strncmp(node, "name", strlen(node)) && SR_STRING_T == value->type) {
-        SET_STR(ctx->firmware.name, value->data.string_val);
-        SET_STR(ctx->oper.name, ctx->firmware.name);
     } else if (0 == strncmp(node, "password", strlen(node)) && SR_STRING_T == value->type) {
         ctx->firmware.credentials.type = CRED_PASSWD;
         SET_STR(ctx->firmware.credentials.val, value->data.string_val);
@@ -222,7 +219,6 @@ static void default_download_policy(struct download_policy *policy)
 
 static void clean_configuration_data(firmware_t *firmware)
 {
-    SET_STR(firmware->name, NULL);
     SET_STR(firmware->credentials.val, NULL);
     SET_STR(firmware->cksum.val, NULL);
     SET_STR(firmware->source.uri, NULL);
@@ -230,7 +226,6 @@ static void clean_configuration_data(firmware_t *firmware)
 
 static void init_operational_data(struct software_oper *oper)
 {
-    SET_STR(oper->name, NULL);
     SET_STR(oper->version, NULL);
     SET_STR(oper->uri, NULL);
     oper->status = mmap(NULL, 12, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
@@ -239,7 +234,6 @@ static void init_operational_data(struct software_oper *oper)
 
 static void clean_operational_data(struct software_oper *oper)
 {
-    SET_STR(oper->name, NULL);
     SET_STR(oper->version, NULL);
     SET_STR(oper->uri, NULL);
 }
@@ -374,9 +368,7 @@ static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *valu
     char *xpath_list = NULL;
     char *xpath = NULL;
 
-    if (NULL == ctx->oper.name)
-        return SR_ERR_OK;
-    if (NULL != ctx->oper.uri)
+    if (NULL == ctx->oper.uri)
         counter++;
     if (NULL != ctx->oper.version)
         counter++;
@@ -391,17 +383,11 @@ static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *valu
 
     counter = 0;
 
-    int xpath_len = strlen(ctx->oper.name) + strlen(ctx->oper.uri) + XPATH_MAX_LEN;
+    int xpath_len = strlen(ctx->oper.uri) + XPATH_MAX_LEN;
     xpath_list = (char *) malloc(sizeof(char) * xpath_len);
     xpath = (char *) malloc(sizeof(char) * xpath_len);
 
-    snprintf(xpath_list, xpath_len, "%s[name='%s']", xpath_base, ctx->oper.name);
-    if (ctx->oper.uri) {
-        snprintf(xpath, xpath_len, "%s/%s", xpath_list, "source");
-        sr_val_set_xpath(&(*values)[counter], xpath);
-        sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->oper.uri);
-        counter++;
-    }
+    snprintf(xpath_list, xpath_len, "%s[address='%s']", xpath_base, ctx->oper.uri);
     if (ctx->oper.version) {
         snprintf(xpath, xpath_len, "%s/%s", xpath_list, "version");
         sr_val_set_xpath(&(*values)[counter], xpath);

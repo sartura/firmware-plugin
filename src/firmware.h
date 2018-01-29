@@ -22,7 +22,7 @@
 #ifndef FIRMWARE_H
 #define FIRMWARE_H
 
-#define YANG "terastream-software-hack"
+#define YANG "terastream-software"
 
 #include <sysrepo.h>
 #include "sysrepo/xpath.h"
@@ -52,7 +52,6 @@ typedef enum cksum_type_e {
 } cksum_type_t;
 
 typedef struct firmware_s {
-    char *name;
     struct source {
         proto_type_t proto;
         char *uri;
@@ -82,7 +81,6 @@ typedef struct ctx_s {
     sr_session_ctx_t *startup_sess;
     firmware_t firmware;
     struct software_oper {
-        char *name;
         char *uri;
         char *version;
         char *status;

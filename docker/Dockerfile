@@ -173,8 +173,8 @@ RUN \
 	  cmake .. && \
 	  make -j2 && \
 	  make install && \
-	  sysrepoctl -i -g ../yang/terastream-software-hack@2017-11-01.yang -s /etc/sysrepo/yang && \
-	  sysrepoctl -e software-credentials-password -m terastream-software-hack
+	  sysrepoctl -i -g ../yang/terastream-software@2017-11-01.yang -s /etc/sysrepo/yang && \
+	  sysrepoctl -e software-credentials-password -m terastream-software
 
 ENV EDITOR vim
 EXPOSE 830
