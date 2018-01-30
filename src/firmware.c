@@ -93,7 +93,7 @@ int load_startup_datastore(ctx_t *ctx)
         sr_free_values(values, count);
     }
 
-    if (true == compare_checksum(&ctx->firmware)) {
+    if (true == compare_checksum(ctx, &ctx->firmware)) {
         INF_MSG("the firmware has the same checksum as the installed one");
         INF_MSG("don't perform sysupgrade");
         return rc;
@@ -277,7 +277,7 @@ static int parse_change(sr_session_ctx_t *session, const char *xpath, ctx_t *ctx
         sr_free_val(new_value);
     }
 
-    if (true == compare_checksum(&ctx->firmware)) {
+    if (true == compare_checksum(ctx, &ctx->firmware)) {
         INF_MSG("the firmware has the same checksum as the installed one");
         INF_MSG("don't perform sysupgrade");
         goto error;
@@ -368,14 +368,16 @@ static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *valu
     char *xpath_list = NULL;
     char *xpath = NULL;
 
-    if (NULL == ctx->oper.uri)
-        counter++;
     if (NULL != ctx->oper.version)
         counter++;
     if (NULL != ctx->oper.message && 0 < strlen(ctx->oper.message))
         counter++;
     if (NULL != ctx->oper.status && 0 < strlen(ctx->oper.status))
         counter++;
+
+    if (0 == counter || NULL == ctx->oper.uri) {
+        goto error;
+    }
 
     *values_cnt = counter;
     rc = sr_new_values(*values_cnt, values);
@@ -387,7 +389,7 @@ static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *valu
     xpath_list = (char *) malloc(sizeof(char) * xpath_len);
     xpath = (char *) malloc(sizeof(char) * xpath_len);
 
-    snprintf(xpath_list, xpath_len, "%s[address='%s']", xpath_base, ctx->oper.uri);
+    snprintf(xpath_list, xpath_len, "%s[source='%s']", xpath_base, ctx->oper.uri);
     if (ctx->oper.version) {
         snprintf(xpath, xpath_len, "%s/%s", xpath_list, "version");
         sr_val_set_xpath(&(*values)[counter], xpath);

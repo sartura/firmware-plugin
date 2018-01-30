@@ -27,7 +27,7 @@
 const char file_path[FILENAME_MAX] = "/tmp/sr_firmware.bin";
 
 /* update checksum */
-bool compare_checksum(firmware_t *firmware)
+bool compare_checksum(ctx_t *ctx, firmware_t *firmware)
 {
     const char *filename = "/etc/sysrepo/sysupgrade/cksum";
     bool equal = false;
@@ -49,6 +49,11 @@ bool compare_checksum(firmware_t *firmware)
     source[newLen++] = '\0';
     if (0 == strncmp(firmware->cksum.val, source, strlen(firmware->cksum.val))) {
         equal = true;
+    }
+
+    if (true == equal) {
+        SET_MEM_STR(ctx->oper.status, "installed");
+        SET_MEM_STR(ctx->oper.message, "");
     }
 
 cleanup:
@@ -247,12 +252,12 @@ static CURLcode firmware_download_ssl(CURL *curl, void *sslctx, void *parm)
 
     /* PEM_read_bio_X509(bio, &cert, 0, NULL); */
     /* if (NULL == cert) */
-    /*	 DEBUG("PEM_read_bio_X509 failed...\n"); */
+    /*     DEBUG("PEM_read_bio_X509 failed...\n"); */
 
     /* store=SSL_CTX_get_cert_store((SSL_CTX *) sslctx); */
 
     /* if (0 == X509_STORE_add_cert(store, cert)) */
-    /*	 DEBUG("error adding certificate\n"); */
+    /*     DEBUG("error adding certificate\n"); */
 
     /* X509_free(cert); */
     /* BIO_free(bio); */
