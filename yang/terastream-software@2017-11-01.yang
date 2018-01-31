@@ -1,7 +1,7 @@
 module terastream-software {
   namespace "http://terastrm.net/ns/yang/terastream-software";
 
-  prefix "ts-swh";
+  prefix "ts-sw";
 
   // import statements here: e.g.,
 
