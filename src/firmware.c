@@ -28,9 +28,9 @@ bool can_restart(ctx_t *ctx)
         return false;
     }
 
-    if (0 == strcmp(ctx->oper.status, "upgrade-in-progress")) {
+    if (0 == strcmp(ctx->installing_software.status, "upgrade-in-progress")) {
         return false;
-    } else if (0 == strcmp(ctx->oper.status, "upgrade-done")) {
+    } else if (0 == strcmp(ctx->installing_software.status, "upgrade-done")) {
         return false;
     }
 
@@ -145,7 +145,7 @@ static int update_firmware(ctx_t *ctx, sr_val_t *value)
 
     if (0 == strncmp(node, "source", strlen(node)) && SR_STRING_T == value->type) {
         SET_STR(ctx->firmware.source.uri, value->data.string_val);
-        SET_STR(ctx->oper.uri, ctx->firmware.source.uri);
+        SET_STR(ctx->installing_software.uri, ctx->firmware.source.uri);
     } else if (0 == strncmp(node, "password", strlen(node)) && SR_STRING_T == value->type) {
         ctx->firmware.credentials.type = CRED_PASSWD;
         SET_STR(ctx->firmware.credentials.val, value->data.string_val);
@@ -194,14 +194,14 @@ static int install_firmware(ctx_t *ctx)
 
     // download the firmware
     INF_MSG("dl-planned");
-    SET_MEM_STR(ctx->oper.status, "dl-planned");
+    SET_MEM_STR(ctx->installing_software.status, "dl-planned");
     rc = firmware_download(ctx);
     CHECK_RET(rc, cleanup, "failed to download firmware: %s", sr_strerror(rc));
     INF_MSG("dl-done");
-    SET_MEM_STR(ctx->oper.status, "dl-done");
+    SET_MEM_STR(ctx->installing_software.status, "dl-done");
 
     INF_MSG("upgrade-in-progress");
-    SET_MEM_STR(ctx->oper.status, "upgrade-in-progress");
+    SET_MEM_STR(ctx->installing_software.status, "upgrade-in-progress");
     // run sysupgrade
     rc = sysupgrade(ctx);
     CHECK_RET(rc, cleanup, "failed to sysupgrade: %s", sr_strerror(rc));
@@ -359,6 +359,35 @@ error:
     return rc;
 }
 
+static int running_software_cb(const char *orig_xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
+{
+    int rc = SR_ERR_OK;
+    ctx_t *ctx = private_ctx;
+    char *xpath = "/ietf-system:system-state/" YANG ":running-software";
+
+    if (NULL == ctx->running_software.uri) {
+        return rc;
+    }
+    if (NULL == ctx->running_software.status) {
+        return rc;
+    }
+    if (0 != strcmp(ctx->running_software.status, "installed")) {
+        return rc;
+    }
+
+    *values_cnt = 1;
+    rc = sr_new_values(*values_cnt, values);
+    CHECK_RET(rc, error, "failed sr_new_values: %s", sr_strerror(rc));
+
+    sr_val_set_xpath(&(*values)[0], xpath);
+    sr_val_set_str_data(&(*values)[0], SR_STRING_T, (char *) ctx->running_software.uri);
+
+    sr_print_val(&(*values)[0]);
+
+error:
+    return rc;
+}
+
 static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
 {
     int rc = SR_ERR_OK;
@@ -368,15 +397,24 @@ static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *valu
     char *xpath_list = NULL;
     char *xpath = NULL;
 
-    if (NULL != ctx->oper.version)
-        counter++;
-    if (NULL != ctx->oper.message && 0 < strlen(ctx->oper.message))
-        counter++;
-    if (NULL != ctx->oper.status && 0 < strlen(ctx->oper.status))
-        counter++;
+    /* currently running software */
+    if (NULL != ctx->running_software.uri) {
+        if (NULL != ctx->running_software.version)
+            counter++;
+        if (NULL != ctx->running_software.message && 0 < strlen(ctx->running_software.message))
+            counter++;
+        if (NULL != ctx->running_software.status && 0 < strlen(ctx->running_software.status))
+            counter++;
+    }
 
-    if (0 == counter || NULL == ctx->oper.uri) {
-        goto error;
+    /* installing software */
+    if (NULL != ctx->installing_software.uri) {
+        if (NULL != ctx->installing_software.version)
+            counter++;
+        if (NULL != ctx->installing_software.message && 0 < strlen(ctx->installing_software.message))
+            counter++;
+        if (NULL != ctx->installing_software.status && 0 < strlen(ctx->installing_software.status))
+            counter++;
     }
 
     *values_cnt = counter;
@@ -385,36 +423,64 @@ static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *valu
 
     counter = 0;
 
-    int xpath_len = strlen(ctx->oper.uri) + XPATH_MAX_LEN;
+    int inst_size = ctx->installing_software.uri ? strlen(ctx->installing_software.uri) : 0;
+    int runn_size = ctx->running_software.uri ? strlen(ctx->running_software.uri) : 0;
+    int uri_size = inst_size > runn_size ? inst_size : runn_size;
+    int xpath_len = uri_size + XPATH_MAX_LEN;
     xpath_list = (char *) malloc(sizeof(char) * xpath_len);
     xpath = (char *) malloc(sizeof(char) * xpath_len);
 
-    snprintf(xpath_list, xpath_len, "%s[source='%s']", xpath_base, ctx->oper.uri);
-    if (ctx->oper.version) {
-        snprintf(xpath, xpath_len, "%s/%s", xpath_list, "version");
-        sr_val_set_xpath(&(*values)[counter], xpath);
-        sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->oper.version);
-        counter++;
-    }
-    if (ctx->oper.status && 0 < strlen(ctx->oper.status)) {
-        snprintf(xpath, xpath_len, "%s/%s", xpath_list, "status");
-        sr_val_set_xpath(&(*values)[counter], xpath);
-        sr_val_set_str_data(&(*values)[counter], SR_ENUM_T, (char *) ctx->oper.status);
-        counter++;
-    }
-    if (ctx->oper.message && 0 < strlen(ctx->oper.message)) {
-        snprintf(xpath, xpath_len, "%s/%s", xpath_list, "message");
-        sr_val_set_xpath(&(*values)[counter], xpath);
-        sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->oper.message);
-        counter++;
-    }
-
-    if (*values_cnt > 0) {
-        INF("Debug sysrepo values printout: %zu", *values_cnt);
-        for (size_t i = 0; i < *values_cnt; i++) {
-            sr_print_val(&(*values)[i]);
+    if (NULL != ctx->installing_software.uri) {
+        snprintf(xpath_list, xpath_len, "%s[source='%s']", xpath_base, ctx->installing_software.uri);
+        if (ctx->installing_software.version) {
+            snprintf(xpath, xpath_len, "%s/%s", xpath_list, "version");
+            sr_val_set_xpath(&(*values)[counter], xpath);
+            sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->installing_software.version);
+            counter++;
+        }
+        if (ctx->installing_software.status && 0 < strlen(ctx->installing_software.status)) {
+            snprintf(xpath, xpath_len, "%s/%s", xpath_list, "status");
+            sr_val_set_xpath(&(*values)[counter], xpath);
+            sr_val_set_str_data(&(*values)[counter], SR_ENUM_T, (char *) ctx->installing_software.status);
+            counter++;
+        }
+        if (ctx->installing_software.message && 0 < strlen(ctx->installing_software.message)) {
+            snprintf(xpath, xpath_len, "%s/%s", xpath_list, "message");
+            sr_val_set_xpath(&(*values)[counter], xpath);
+            sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->installing_software.message);
+            counter++;
         }
     }
+
+    /* running software */
+    if (NULL != ctx->running_software.uri) {
+        snprintf(xpath_list, xpath_len, "%s[source='%s']", xpath_base, ctx->running_software.uri);
+        if (ctx->running_software.version) {
+            snprintf(xpath, xpath_len, "%s/%s", xpath_list, "version");
+            sr_val_set_xpath(&(*values)[counter], xpath);
+            sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->running_software.version);
+            counter++;
+        }
+        if (ctx->running_software.status && 0 < strlen(ctx->running_software.status)) {
+            snprintf(xpath, xpath_len, "%s/%s", xpath_list, "status");
+            sr_val_set_xpath(&(*values)[counter], xpath);
+            sr_val_set_str_data(&(*values)[counter], SR_ENUM_T, (char *) ctx->running_software.status);
+            counter++;
+        }
+        if (ctx->running_software.message && 0 < strlen(ctx->running_software.message)) {
+            snprintf(xpath, xpath_len, "%s/%s", xpath_list, "message");
+            sr_val_set_xpath(&(*values)[counter], xpath);
+            sr_val_set_str_data(&(*values)[counter], SR_STRING_T, (char *) ctx->running_software.message);
+            counter++;
+        }
+    }
+
+    //if (*values_cnt > 0) {
+    //    INF("Debug sysrepo values printout: %zu", *values_cnt);
+    //    for (size_t i = 0; i < *values_cnt; i++) {
+    //        sr_print_val(&(*values)[i]);
+    //    }
+    //}
 
 error:
     if (NULL != xpath) {
@@ -607,7 +673,8 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
     ctx->yang_model = YANG;
     *private_ctx = ctx;
     clean_configuration_data(&ctx->firmware);
-    init_operational_data(&ctx->oper);
+    init_operational_data(&ctx->installing_software);
+    init_operational_data(&ctx->running_software);
     default_download_policy(&ctx->firmware.policy);
 
     /* load the startup datastore */
@@ -631,6 +698,9 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
     CHECK_RET(rc, error, "failed sr_dp_get_items_subscribe: %s", sr_strerror(rc));
 
     rc = sr_dp_get_items_subscribe(ctx->sess, "/ietf-system:system-state/" YANG ":software", state_data_cb, ctx, SR_SUBSCR_CTX_REUSE, &ctx->sub);
+    CHECK_RET(rc, error, "failed sr_dp_get_items_subscribe: %s", sr_strerror(rc));
+
+    rc = sr_dp_get_items_subscribe(ctx->sess, "/ietf-system:system-state/" YANG ":running-software", running_software_cb, ctx, SR_SUBSCR_CTX_REUSE, &ctx->sub);
     CHECK_RET(rc, error, "failed sr_dp_get_items_subscribe: %s", sr_strerror(rc));
 
     rc = sr_rpc_subscribe(ctx->sess, "/" YANG ":system-reset-restart", rpc_firstboot_cb, ctx, SR_SUBSCR_CTX_REUSE, &ctx->sub);
@@ -671,7 +741,8 @@ void sr_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_ctx)
         sr_unsubscribe(session, ctx->sub);
     }
     clean_configuration_data(&ctx->firmware);
-    clean_operational_data(&ctx->oper);
+    clean_operational_data(&ctx->installing_software);
+    clean_operational_data(&ctx->running_software);
 
     if (can_restart(ctx) && sysupgrade_pid > 0) {
         INF_MSG("kill background sysupgrade process");

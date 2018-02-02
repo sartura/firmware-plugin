@@ -10,7 +10,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *	http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -70,8 +70,15 @@ typedef struct firmware_s {
         uint32_t retry_interval;
         uint32_t retry_randomness;
     } policy;
-    // TODO 	struct upgrade_policy {
+    // TODO     struct upgrade_policy {
 } firmware_t;
+
+typedef struct software_oper {
+    char *uri;
+    char *version;
+    char *status;
+    char *message;
+} oper;
 
 typedef struct ctx_s {
     const char *yang_model;
@@ -80,12 +87,8 @@ typedef struct ctx_s {
     sr_conn_ctx_t *startup_conn;
     sr_session_ctx_t *startup_sess;
     firmware_t firmware;
-    struct software_oper {
-        char *uri;
-        char *version;
-        char *status;
-        char *message;
-	} oper;
+    oper installing_software;
+    oper running_software;
 } ctx_t;
 
 #endif /* FIRMWARE_H */

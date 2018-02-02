@@ -52,8 +52,9 @@ bool compare_checksum(ctx_t *ctx, firmware_t *firmware)
     }
 
     if (true == equal) {
-        SET_MEM_STR(ctx->oper.status, "installed");
-        SET_MEM_STR(ctx->oper.message, "");
+        SET_STR(ctx->running_software.uri, firmware->source.uri);
+        SET_MEM_STR(ctx->running_software.status, "installed");
+        SET_MEM_STR(ctx->running_software.message, "");
     }
 
 cleanup:
@@ -411,33 +412,33 @@ int firmware_download(ctx_t *ctx)
     while (0 == ctx->firmware.policy.download_attempts ||
            (0 < ctx->firmware.policy.download_attempts && download_attempts < ctx->firmware.policy.download_attempts)) {
         INF_MSG("downloading");
-        SET_MEM_STR(ctx->oper.status, "downloading");
+        SET_MEM_STR(ctx->installing_software.status, "downloading");
         download_attempts++;
-        SET_MEM_STR(ctx->oper.message, "starting download with libcurl");
+        SET_MEM_STR(ctx->installing_software.message, "starting download with libcurl");
         curl_ret = curl_easy_perform(curl);
-        SET_MEM_STR(ctx->oper.message, "libcurl finished");
+        SET_MEM_STR(ctx->installing_software.message, "libcurl finished");
         if (CURLE_OK == curl_ret) {
             long http_code = 0;
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
             if (http_code == 200 && curl_ret != CURLE_ABORTED_BY_CALLBACK) {
                 INF_MSG("download-done");
-                SET_MEM_STR(ctx->oper.status, "download-done");
+                SET_MEM_STR(ctx->installing_software.status, "download-done");
                 break;
             } else {
                 INF_MSG("dl-verification-failed");
-                SET_MEM_STR(ctx->oper.status, "dl-verification-failed");
+                SET_MEM_STR(ctx->installing_software.status, "dl-verification-failed");
                 char message[30] = {0};
                 sprintf(message, "libcurl returned error code %ld", http_code);
-                SET_MEM_STR(ctx->oper.message, message);
+                SET_MEM_STR(ctx->installing_software.message, message);
             }
         }
         INF_MSG("downloading-failed");
-        SET_MEM_STR(ctx->oper.status, "download-failed");
+        SET_MEM_STR(ctx->installing_software.status, "download-failed");
         uint32_t time = ctx->firmware.policy.retry_interval + (rand() % ctx->firmware.policy.retry_randomness);
         INF("wait for %d seconds", time);
         char message[120];
         sprintf(message, "download failed, starting new attempt in %d seconds", time);
-        SET_MEM_STR(ctx->oper.message, message);
+        SET_MEM_STR(ctx->installing_software.message, message);
         sleep(time);
     }
 
@@ -447,9 +448,9 @@ int firmware_download(ctx_t *ctx)
 
     /* checksum checke */
     if (true == checksum_check(&ctx->firmware)) {
-        SET_MEM_STR(ctx->oper.message, "correct checksum");
+        SET_MEM_STR(ctx->installing_software.message, "correct checksum");
     } else {
-        SET_MEM_STR(ctx->oper.message, "wrong checksum");
+        SET_MEM_STR(ctx->installing_software.message, "wrong checksum");
         rc = SR_ERR_INTERNAL;
     }
 
@@ -485,13 +486,13 @@ int sysupgrade(ctx_t *ctx)
     if (0 < strlen(result)) {
         /* image check failed */
         ERR("upgrade faild with message:%s", result);
-        SET_MEM_STR(ctx->oper.message, result);
-        SET_MEM_STR(ctx->oper.status, "upgrade-failed");
+        SET_MEM_STR(ctx->installing_software.message, result);
+        SET_MEM_STR(ctx->installing_software.status, "upgrade-failed");
         return rc;
     }
 
-    SET_MEM_STR(ctx->oper.status, "upgrade-in-progress");
-    SET_MEM_STR(ctx->oper.message, "starting sysupgrade with ubus call");
+    SET_MEM_STR(ctx->installing_software.status, "upgrade-in-progress");
+    SET_MEM_STR(ctx->installing_software.message, "starting sysupgrade with ubus call");
     if ((pid = fork()) == 0) {
         signal(SIGHUP, SIG_IGN);
         setsid();
@@ -509,7 +510,7 @@ int sysupgrade(ctx_t *ctx)
         blob_buf_init(&buf, 0);
         u_rc = ubus_lookup_id(u_ctx, "juci.sysupgrade", &id);
         if (UBUS_STATUS_OK != u_rc) {
-            SET_MEM_STR(ctx->oper.message, "no object juci.sysupgrade");
+            SET_MEM_STR(ctx->installing_software.message, "no object juci.sysupgrade");
             ERR("ubus [%d]: no object juci.sysupgrade", u_rc);
             goto cleanup;
         }
@@ -537,12 +538,12 @@ int sysupgrade(ctx_t *ctx)
 
         u_rc = ubus_invoke(u_ctx, id, "start", buf.head, NULL, NULL, 0);
         if (UBUS_STATUS_OK != u_rc) {
-            SET_MEM_STR(ctx->oper.message, "no object start");
+            SET_MEM_STR(ctx->installing_software.message, "no object start");
             ERR("ubus [%d]: no object start", u_rc);
             goto cleanup;
         }
 
-        SET_MEM_STR(ctx->oper.status, "upgrade-done");
+        SET_MEM_STR(ctx->installing_software.status, "upgrade-done");
 
     cleanup:
         if (NULL != u_ctx) {

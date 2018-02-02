@@ -309,11 +309,19 @@ module terastream-software {
    */
   augment "/sys:system-state" {
 
+    leaf running-software {
+      type leafref {
+        path "../ts-sw:software/source";
+      }
+      description
+       "Currently running software on the HGW.";
+    }
+
     list software {
         description "State related to system software";
 
         key source;
-        max-elements 1;
+        max-elements 2;
 
         leaf source {
           description
