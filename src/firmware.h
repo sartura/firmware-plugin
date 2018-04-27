@@ -91,4 +91,10 @@ typedef struct ctx_s {
     oper running_software;
 } ctx_t;
 
+typedef struct ubus_ctx_s {
+	ctx_t *ctx;
+	sr_val_t **values;
+	size_t *values_cnt;
+} ubus_ctx_t;
+
 #endif /* FIRMWARE_H */

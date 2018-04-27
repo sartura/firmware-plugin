@@ -187,17 +187,9 @@ RUN chmod +x /usr/libexec/rpcd/juci.system
 COPY juci.sysupgrade /usr/libexec/rpcd/juci.sysupgrade
 RUN chmod +x /usr/libexec/rpcd/juci.sysupgrade
 
-# serial number
-RUN mkdir -p /opt/proc/nvram
-RUN echo "EG4024H171036684\n" > /opt/proc/nvram/SerialNumber
-
-# add command db
-RUN \
-      mkdir -p /opt/command && \
-      echo "#!/bin/sh\necho 'EG400-WU21U_PANTERA-DEV3.12.0-171103_1128'" > /opt/command/db && \
-      chmod u+x /opt/command/db && \
-      . ~/.profile
-ENV PATH="/opt/command:${PATH}"
+# ubus call router.system
+COPY router.system /usr/libexec/rpcd/router.system
+run chmod +x /usr/libexec/rpcd/router.system
 
 COPY supervisord.conf /etc/supervisord.conf
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

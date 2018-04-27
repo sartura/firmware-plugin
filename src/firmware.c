@@ -7,6 +7,7 @@
 #include <libubus.h>
 #include <libubox/blobmsg.h>
 #include <libubox/blobmsg_json.h>
+#include <json-c/json.h>
 
 #include <sysrepo.h>
 #include <sysrepo/plugins.h>
@@ -492,66 +493,171 @@ error:
     return rc;
 }
 
+static void serial_number_ubus_cb(struct ubus_request *req, int type, struct blob_attr *msg)
+{
+    ubus_ctx_t *ubus_ctx = req->priv;
+    struct json_object *jobj_parent = NULL, *jobj_system = NULL, *jobj_serial = NULL;
+    char *json_string = NULL;
+    const char *result_string = NULL;
+    int rc = SR_ERR_OK;
+
+    if (msg) {
+        json_string = blobmsg_format_json(msg, true);
+        jobj_parent = json_tokener_parse(json_string);
+    } else {
+        goto cleanup;
+    }
+
+    json_object_object_get_ex(jobj_parent, "system", &jobj_system);
+    if (NULL == jobj_system) {
+        goto cleanup;
+    }
+    json_object_object_get_ex(jobj_system, "serialno", &jobj_serial);
+    if (NULL == jobj_serial) {
+        goto cleanup;
+    }
+
+    result_string = json_object_get_string(jobj_serial);
+
+    *ubus_ctx->values_cnt = 1;
+    rc = sr_new_val("/ietf-system:system-state/ietf-system:platform/" YANG ":serial-number", ubus_ctx->values);
+    CHECK_RET(rc, cleanup, "failed sr_new_values: %s", sr_strerror(rc));
+    sr_val_set_str_data(*ubus_ctx->values, SR_STRING_T, result_string);
+
+cleanup:
+    if (NULL != jobj_parent) {
+        json_object_put(jobj_parent);
+    }
+    if (NULL != json_string) {
+        free(json_string);
+    }
+    return;
+}
+
 static int serial_number_cb(const char *xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
 {
     int rc = SR_ERR_OK;
-    FILE *file = NULL;
-    char result[128];
-    char *sn_file_path = "/proc/nvram/SerialNumber";
+    ctx_t *ctx = private_ctx;
+    uint32_t id = 0;
+    struct blob_buf buf = {0};
+    ubus_ctx_t ubus_ctx = {0, 0, 0};
+    int u_rc = UBUS_STATUS_OK;
 
-    file = fopen(sn_file_path, "r");
-    if (NULL == file) {
-        ERR("could not open file %s", sn_file_path);
+    struct ubus_context *u_ctx = ubus_connect(NULL);
+    if (u_ctx == NULL) {
+        ERR_MSG("Could not connect to ubus");
         rc = SR_ERR_INTERNAL;
-        goto error;
+        goto cleanup;
     }
 
-    while (fgets(result, sizeof(result) - 1, file) != NULL) {
+    blob_buf_init(&buf, 0);
+    u_rc = ubus_lookup_id(u_ctx, "router.system", &id);
+    if (UBUS_STATUS_OK != u_rc) {
+        ERR("ubus [%d]: no object router.system\n", u_rc);
+        rc = SR_ERR_INTERNAL;
+        goto cleanup;
     }
-    result[strlen(result) - 1] = '\0';
 
-    rc = sr_new_values(1, values);
-    CHECK_RET(rc, error, "failed sr_new_values %s", sr_strerror(rc));
-    *values_cnt = 1;
-    sr_val_set_xpath(*values, "/ietf-system:system-state/platform/" YANG ":serial-number");
-    sr_val_set_str_data(*values, SR_STRING_T, result);
+    ubus_ctx.ctx = ctx;
+    ubus_ctx.values = values;
+    ubus_ctx.values_cnt = values_cnt;
+    u_rc = ubus_invoke(u_ctx, id, "info", buf.head, serial_number_ubus_cb, &ubus_ctx, 0);
+    if (UBUS_STATUS_OK != u_rc) {
+        ERR("ubus [%d]: no object info\n", u_rc);
+        rc = SR_ERR_INTERNAL;
+        goto cleanup;
+    }
 
-error:
-    if (NULL == file) {
-        pclose(file);
+cleanup:
+    if (NULL != u_ctx) {
+        ubus_free(u_ctx);
+        blob_buf_free(&buf);
     }
     return rc;
+}
+
+static void software_version_ubus_cb(struct ubus_request *req, int type, struct blob_attr *msg)
+{
+    ubus_ctx_t *ubus_ctx = req->priv;
+    struct json_object *jobj_parent = NULL, *jobj_system = NULL, *jobj_firmware = NULL;
+    char *json_string = NULL;
+    const char *result_string = NULL;
+    int rc = SR_ERR_OK;
+
+    if (msg) {
+        json_string = blobmsg_format_json(msg, true);
+        jobj_parent = json_tokener_parse(json_string);
+    } else {
+        goto cleanup;
+    }
+
+    json_object_object_get_ex(jobj_parent, "system", &jobj_system);
+    if (NULL == jobj_system) {
+        goto cleanup;
+    }
+    json_object_object_get_ex(jobj_system, "firmware", &jobj_firmware);
+    if (NULL == jobj_firmware) {
+        goto cleanup;
+    }
+
+    result_string = json_object_get_string(jobj_firmware);
+
+    *ubus_ctx->values_cnt = 1;
+    rc = sr_new_val("/ietf-system:system-state/ietf-system:platform/" YANG ":software-version", ubus_ctx->values);
+    CHECK_RET(rc, cleanup, "failed sr_new_values: %s", sr_strerror(rc));
+    sr_val_set_str_data(*ubus_ctx->values, SR_STRING_T, result_string);
+
+cleanup:
+    if (NULL != jobj_parent) {
+        json_object_put(jobj_parent);
+    }
+    if (NULL != json_string) {
+        free(json_string);
+    }
+    return;
 }
 
 static int software_version_cb(const char *xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
 {
     int rc = SR_ERR_OK;
-    char result[128];
-    FILE *file = NULL;
-    const char *command = "db -q get hw.board.iopVersion";
+    ctx_t *ctx = private_ctx;
+    uint32_t id = 0;
+    struct blob_buf buf = {0};
+    ubus_ctx_t ubus_ctx = {0, 0, 0};
+    int u_rc = UBUS_STATUS_OK;
 
-    file = popen(command, "r");
-    if (NULL == file) {
-        ERR("could not run command %s", command);
+    struct ubus_context *u_ctx = ubus_connect(NULL);
+    if (u_ctx == NULL) {
+        ERR_MSG("Could not connect to ubus");
         rc = SR_ERR_INTERNAL;
-        goto error;
+        goto cleanup;
     }
 
-    while (fgets(result, sizeof(result) - 1, file) != NULL) {
+    blob_buf_init(&buf, 0);
+    u_rc = ubus_lookup_id(u_ctx, "router.system", &id);
+    if (UBUS_STATUS_OK != u_rc) {
+        ERR("ubus [%d]: no object router.system\n", u_rc);
+        rc = SR_ERR_INTERNAL;
+        goto cleanup;
     }
-    result[strlen(result) - 1] = '\0';
 
-    rc = sr_new_values(1, values);
-    CHECK_RET(rc, error, "failed sr_new_values %s", sr_strerror(rc));
-    *values_cnt = 1;
-    sr_val_set_xpath(*values, "/ietf-system:system-state/platform/" YANG ":software-version");
-    sr_val_set_str_data(*values, SR_STRING_T, result);
+    ubus_ctx.ctx = ctx;
+    ubus_ctx.values = values;
+    ubus_ctx.values_cnt = values_cnt;
+    u_rc = ubus_invoke(u_ctx, id, "info", buf.head, software_version_ubus_cb, &ubus_ctx, 0);
+    if (UBUS_STATUS_OK != u_rc) {
+        ERR("ubus [%d]: no object info\n", u_rc);
+        rc = SR_ERR_INTERNAL;
+        goto cleanup;
+    }
 
-error:
-    if (NULL == file) {
-        pclose(file);
+cleanup:
+    if (NULL != u_ctx) {
+        ubus_free(u_ctx);
+        blob_buf_free(&buf);
     }
     return rc;
+
 }
 
 static int
