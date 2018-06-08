@@ -207,6 +207,13 @@ static int install_firmware(ctx_t *ctx)
     rc = sysupgrade(ctx);
     CHECK_RET(rc, cleanup, "failed to sysupgrade: %s", sr_strerror(rc));
 
+    if (SR_ERR_INTERNAL == rc) {
+        char *filename = "/var/sysupgrade.lock";
+        if( access(filename, F_OK ) != -1 ) {
+            remove(filename);
+        }
+    }
+
 cleanup:
     return rc;
 }

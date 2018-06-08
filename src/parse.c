@@ -488,7 +488,7 @@ int sysupgrade(ctx_t *ctx)
         ERR("upgrade faild with message:%s", result);
         SET_MEM_STR(ctx->installing_software.message, result);
         SET_MEM_STR(ctx->installing_software.status, "upgrade-failed");
-        return rc;
+        return SR_ERR_INTERNAL;
     }
 
     SET_MEM_STR(ctx->installing_software.status, "upgrade-in-progress");
