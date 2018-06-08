@@ -70,12 +70,10 @@ RUN \
 
 # libssh
 RUN \
-      git clone http://git.libssh.org/projects/libssh.git && \
-      cd libssh && mkdir build && cd build && \
-      cmake .. && \
-      make -j2 && \
-      make install && \
-      ldconfig
+      apt-get install -y software-properties-common python-software-properties && \
+	  add-apt-repository ppa:kedazo/libssh-0.7.x && \
+	  apt-get update && \
+	  apt-get install -y libssh-dev
 
 # libnetconf2
 RUN \
