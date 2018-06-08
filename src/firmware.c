@@ -273,6 +273,10 @@ static int parse_change(sr_session_ctx_t *session, const char *xpath, ctx_t *ctx
         } else if ((SR_OP_MODIFIED == oper || SR_OP_CREATED == oper) && new_value &&
                    0 == strncmp(new_value->xpath, xpath_download_policy, strlen(xpath_download_policy))) {
             rc = update_firmware(ctx, new_value);
+        } else if ((SR_OP_DELETED == oper) && old_value &&
+                   0 == strstr(old_value->xpath, "preserve-configuration")) {
+            ctx->firmware.preserve_configuration = true;
+            software_changed = true;
         }
         sr_free_val(old_value);
         sr_free_val(new_value);
