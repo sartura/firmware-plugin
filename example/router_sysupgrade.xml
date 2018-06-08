@@ -1,7 +1,6 @@
 <system xmlns="urn:ietf:params:xml:ns:yang:ietf-system">
-  <software xmlns="http://terastrm.net/ns/yang/terastream-software-hack">
+  <software xmlns="http://terastrm.net/ns/yang/terastream-software">
     <software>
-      <name>not_important</name>
       <source>http://192.168.1.215:8000/EG400-WU21U_PANTERA-DEV3.13.1-171108_1417.y2</source>
       <password>
         <password>none</password>
