@@ -468,7 +468,6 @@ int sysupgrade(ctx_t *ctx)
     int rc = SR_ERR_OK;
     char result[1024] = {0};
     char command[128] = {0};
-    size_t pid;
     FILE *file = NULL;
 
     sprintf(command, "sysupgrade -T %s", file_path);
@@ -495,64 +494,59 @@ int sysupgrade(ctx_t *ctx)
 
     SET_MEM_STR(ctx->installing_software.status, "upgrade-in-progress");
     SET_MEM_STR(ctx->installing_software.message, "starting sysupgrade with ubus call");
-    if ((pid = fork()) == 0) {
-        signal(SIGHUP, SIG_IGN);
-        setsid();
-        struct blob_buf buf = {0};
-        struct json_object *p;
-        uint32_t id = 0;
-        int u_rc = 0;
+    struct blob_buf buf = {0};
+    struct json_object *p;
+    uint32_t id = 0;
+    int u_rc = 0;
 
-        struct ubus_context *u_ctx = ubus_connect(NULL);
-        if (u_ctx == NULL) {
-            ERR_MSG("Could not connect to ubus");
-            goto cleanup;
+    struct ubus_context *u_ctx = ubus_connect(NULL);
+    if (u_ctx == NULL) {
+        ERR_MSG("Could not connect to ubus");
+        goto cleanup;
+    }
+
+    blob_buf_init(&buf, 0);
+    u_rc = ubus_lookup_id(u_ctx, "juci.sysupgrade", &id);
+    if (UBUS_STATUS_OK != u_rc) {
+        SET_MEM_STR(ctx->installing_software.message, "no object juci.sysupgrade");
+        ERR("ubus [%d]: no object juci.sysupgrade", u_rc);
+        goto cleanup;
+    }
+
+    p = json_object_new_object();
+    json_object_object_add(p, "path", json_object_new_string(file_path));
+
+    if (ctx->firmware.preserve_configuration) {
+        json_object_object_add(p, "keep", json_object_new_string("1"));
+        /* if /etc/sysrepo/sysupgrade does not exist, create it */
+        const char *dir = "/etc/sysrepo/sysupgrade";
+        struct stat st = {0};
+
+        if (stat(dir, &st) == -1) {
+            mkdir(dir, 0700);
         }
+        generate_startup_data(&ctx->firmware);
+        update_checksum(&ctx->firmware);
+    } else {
+        json_object_object_add(p, "keep", json_object_new_string("0"));
+    }
+    const char *json_data = json_object_get_string(p);
+    blobmsg_add_json_from_string(&buf, json_data);
+    json_object_put(p);
 
-        blob_buf_init(&buf, 0);
-        u_rc = ubus_lookup_id(u_ctx, "juci.sysupgrade", &id);
-        if (UBUS_STATUS_OK != u_rc) {
-            SET_MEM_STR(ctx->installing_software.message, "no object juci.sysupgrade");
-            ERR("ubus [%d]: no object juci.sysupgrade", u_rc);
-            goto cleanup;
-        }
+    u_rc = ubus_invoke(u_ctx, id, "start", buf.head, NULL, NULL, 0);
+    if (UBUS_STATUS_OK != u_rc) {
+        SET_MEM_STR(ctx->installing_software.message, "no object start");
+        ERR("ubus [%d]: no object start", u_rc);
+        goto cleanup;
+    }
 
-        p = json_object_new_object();
-        json_object_object_add(p, "path", json_object_new_string(file_path));
+    SET_MEM_STR(ctx->installing_software.status, "upgrade-done");
 
-        if (ctx->firmware.preserve_configuration) {
-            json_object_object_add(p, "keep", json_object_new_string("1"));
-            /* if /etc/sysrepo/sysupgrade does not exist, create it */
-            const char *dir = "/etc/sysrepo/sysupgrade";
-            struct stat st = {0};
-
-            if (stat(dir, &st) == -1) {
-                mkdir(dir, 0700);
-            }
-            generate_startup_data(&ctx->firmware);
-            update_checksum(&ctx->firmware);
-        } else {
-            json_object_object_add(p, "keep", json_object_new_string("0"));
-        }
-        const char *json_data = json_object_get_string(p);
-        blobmsg_add_json_from_string(&buf, json_data);
-        json_object_put(p);
-
-        u_rc = ubus_invoke(u_ctx, id, "start", buf.head, NULL, NULL, 0);
-        if (UBUS_STATUS_OK != u_rc) {
-            SET_MEM_STR(ctx->installing_software.message, "no object start");
-            ERR("ubus [%d]: no object start", u_rc);
-            goto cleanup;
-        }
-
-        SET_MEM_STR(ctx->installing_software.status, "upgrade-done");
-
-    cleanup:
-        if (NULL != u_ctx) {
-            ubus_free(u_ctx);
-            blob_buf_free(&buf);
-        }
-        exit(EXIT_SUCCESS);
+cleanup:
+    if (NULL != u_ctx) {
+        ubus_free(u_ctx);
+        blob_buf_free(&buf);
     }
 
     return rc;
