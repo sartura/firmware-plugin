@@ -16,6 +16,7 @@
 #include "common.h"
 #include "firmware.h"
 #include "parse.h"
+#include "version.h"
 
 static int install_firmware(ctx_t *);
 static int update_firmware(ctx_t *, sr_val_t *);
