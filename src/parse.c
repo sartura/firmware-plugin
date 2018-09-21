@@ -26,6 +26,18 @@
 
 const char file_path[FILENAME_MAX] = "/tmp/sr_firmware.bin";
 
+void delete_firmware(const char *filename) {
+    int ret;
+
+    ret = remove(filename);
+
+    if (ret == 0) {
+        INF("Deleted firmware %s.", filename);
+    } else {
+        ERR("Couldn't delete firmware %s.", filename);
+    }
+}
+
 /* update checksum */
 bool compare_checksum(ctx_t *ctx, firmware_t *firmware)
 {
@@ -360,6 +372,8 @@ int firmware_download(ctx_t *ctx)
     const char *public_keyfile_path = "";
     uint32_t download_attempts = 0;
 
+    delete_firmware(file_path);
+
     /* open file */
     fd_data = fopen(file_path, "wb");
     if (NULL == fd_data) {
@@ -439,7 +453,20 @@ int firmware_download(ctx_t *ctx)
         char message[120];
         sprintf(message, "download failed, starting new attempt in %d seconds", time);
         SET_MEM_STR(ctx->installing_software.message, message);
+
+        /* close the file */
+        fclose(fd_data);
+        fd_data = NULL;
+        /* delete the file */
+        delete_firmware(file_path);
+        /* wait */
         sleep(time);
+        /* open file */
+        fd_data = fopen(file_path, "wb");
+        if (NULL == fd_data) {
+            rc = SR_ERR_INTERNAL;
+            goto cleanup;
+        }
     }
 
     /* close the firmware image file */
@@ -459,6 +486,10 @@ cleanup:
         fclose(fd_data);
     }
     curl_easy_cleanup(curl);
+
+    if (SR_ERR_OK != rc) {
+        delete_firmware(file_path);
+    }
 
     return rc;
 }
