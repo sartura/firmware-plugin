@@ -200,7 +200,7 @@ static int install_firmware(ctx_t *ctx)
     rc = firmware_download(ctx);
     CHECK_RET(rc, cleanup, "failed to download firmware: %s", sr_strerror(rc));
     INF_MSG("dl-done");
-    SET_MEM_STR(ctx->installing_software.status, "dl-done");
+    SET_MEM_STR(ctx->installing_software.status, "dlownload-done");
 
     INF_MSG("upgrade-in-progress");
     SET_MEM_STR(ctx->installing_software.status, "upgrade-in-progress");
