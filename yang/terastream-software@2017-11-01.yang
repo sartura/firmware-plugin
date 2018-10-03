@@ -371,7 +371,7 @@ module terastream-software {
         }
 
         leaf progress {
-          when "../status = 'dl-in-progress'";
+          when "../status = 'downloading'";
           type percent;
         }
 
