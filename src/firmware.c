@@ -372,7 +372,12 @@ error:
     return rc;
 }
 
-static int running_software_cb(const char *orig_xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
+static int
+#ifdef SYSREPO_LESS_0_7_5
+running_software_cb(const char *orig_xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
+#else
+running_software_cb(const char *orig_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, void *private_ctx)
+#endif
 {
     int rc = SR_ERR_OK;
     ctx_t *ctx = private_ctx;
@@ -401,7 +406,12 @@ error:
     return rc;
 }
 
-static int state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
+static int
+#ifdef SYSREPO_LESS_0_7_5
+state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
+#else
+state_data_cb(const char *orig_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, void *private_ctx)
+#endif
 {
     int rc = SR_ERR_OK;
     ctx_t *ctx = private_ctx;
@@ -546,7 +556,12 @@ cleanup:
     return;
 }
 
-static int serial_number_cb(const char *xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
+static int
+#ifdef SYSREPO_LESS_0_7_5
+serial_number_cb(const char *xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
+#else
+serial_number_cb(const char *xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, void *private_ctx)
+#endif
 {
     int rc = SR_ERR_OK;
     ctx_t *ctx = private_ctx;
@@ -629,7 +644,12 @@ cleanup:
     return;
 }
 
-static int software_version_cb(const char *xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
+static int
+#ifdef SYSREPO_LESS_0_7_5
+software_version_cb(const char *xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
+#else
+software_version_cb(const char *xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, void *private_ctx)
+#endif
 {
     int rc = SR_ERR_OK;
     ctx_t *ctx = private_ctx;
