@@ -14,7 +14,6 @@
 #include <sys/stat.h>
 
 #include <json-c/json.h>
-#include <libubus.h>
 #include <libubox/blobmsg.h>
 #include <libubox/blobmsg_json.h>
 
@@ -501,7 +500,7 @@ int sysupgrade(ctx_t *ctx)
     char command[128] = {0};
     FILE *file = NULL;
 
-    sprintf(command, "sysupgrade -T %s", file_path);
+    sprintf(command, "/sbin/sysupgrade -T %s", file_path);
 
     /* perform sysupgrade check */
     file = popen(command, "r");
@@ -524,61 +523,38 @@ int sysupgrade(ctx_t *ctx)
     }
 
     SET_MEM_STR(ctx->installing_software.status, "upgrade-in-progress");
-    SET_MEM_STR(ctx->installing_software.message, "starting sysupgrade with ubus call");
-    struct blob_buf buf = {0};
-    struct json_object *p;
-    uint32_t id = 0;
-    int u_rc = 0;
-
-    struct ubus_context *u_ctx = ubus_connect(NULL);
-    if (u_ctx == NULL) {
-        ERR_MSG("Could not connect to ubus");
-        goto cleanup;
-    }
-
-    blob_buf_init(&buf, 0);
-    u_rc = ubus_lookup_id(u_ctx, "juci.sysupgrade", &id);
-    if (UBUS_STATUS_OK != u_rc) {
-        SET_MEM_STR(ctx->installing_software.message, "no object juci.sysupgrade");
-        ERR("ubus [%d]: no object juci.sysupgrade", u_rc);
-        goto cleanup;
-    }
-
-    p = json_object_new_object();
-    json_object_object_add(p, "path", json_object_new_string(file_path));
+    SET_MEM_STR(ctx->installing_software.message, "starting sysupgrade call");
 
     if (ctx->firmware.preserve_configuration) {
-        json_object_object_add(p, "keep", json_object_new_string("1"));
-        /* if /etc/sysrepo/sysupgrade does not exist, create it */
-        const char *dir = "/etc/sysrepo/sysupgrade";
-        struct stat st = {0};
-
-        if (stat(dir, &st) == -1) {
-            mkdir(dir, 0700);
-        }
-        generate_startup_data(&ctx->firmware);
-        update_checksum(&ctx->firmware);
+        sprintf(command, "/sbin/sysupgrade %s", file_path);
     } else {
-        json_object_object_add(p, "keep", json_object_new_string("0"));
+        sprintf(command, "/sbin/sysupgrade -n %s", file_path);
     }
-    const char *json_data = json_object_get_string(p);
-    blobmsg_add_json_from_string(&buf, json_data);
-    json_object_put(p);
 
-    u_rc = ubus_invoke(u_ctx, id, "start", buf.head, NULL, NULL, 0);
-    if (UBUS_STATUS_OK != u_rc) {
-        SET_MEM_STR(ctx->installing_software.message, "no object start");
-        ERR("ubus [%d]: no object start", u_rc);
-        goto cleanup;
+    generate_startup_data(&ctx->firmware);
+    update_checksum(&ctx->firmware);
+
+    /* perform sysupgrade check */
+    file = popen(command, "r");
+    if (NULL == file) {
+        ERR("could not run command %s", command);
+    }
+
+    while (fgets(result, sizeof(result) - 1, file) != NULL) {}
+    result[strlen(result) - 1] = '\0';
+    status = pclose(file);
+
+    /* image check failed */
+    if (0 != WEXITSTATUS(status)) {
+        if (0 < strlen(result)) {
+            ERR("upgrade faild with message:%s", result);
+            SET_MEM_STR(ctx->installing_software.message, result);
+            SET_MEM_STR(ctx->installing_software.status, "upgrade-failed");
+        }
+        return SR_ERR_INTERNAL;
     }
 
     SET_MEM_STR(ctx->installing_software.status, "upgrade-done");
-
-cleanup:
-    if (NULL != u_ctx) {
-        ubus_free(u_ctx);
-        blob_buf_free(&buf);
-    }
 
     return rc;
 }
