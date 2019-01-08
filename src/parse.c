@@ -525,14 +525,21 @@ int sysupgrade(ctx_t *ctx)
     SET_MEM_STR(ctx->installing_software.status, "upgrade-in-progress");
     SET_MEM_STR(ctx->installing_software.message, "starting sysupgrade call");
 
-    if (ctx->firmware.preserve_configuration) {
+    if (true == ctx->firmware.preserve_configuration) {
+        /* if /etc/sysrepo/sysupgrade does not exist, create it */
+        const char *dir = "/etc/sysrepo/sysupgrade";
+        struct stat st = {0};
+
+        if (stat(dir, &st) == -1) {
+            mkdir(dir, 0700);
+        }
+
+        generate_startup_data(&ctx->firmware);
+        update_checksum(&ctx->firmware);
         sprintf(command, "/sbin/sysupgrade %s", file_path);
     } else {
         sprintf(command, "/sbin/sysupgrade -n %s", file_path);
     }
-
-    generate_startup_data(&ctx->firmware);
-    update_checksum(&ctx->firmware);
 
     /* perform sysupgrade check */
     file = popen(command, "r");
