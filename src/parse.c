@@ -542,24 +542,7 @@ int sysupgrade(ctx_t *ctx)
     }
 
     /* perform sysupgrade check */
-    file = popen(command, "r");
-    if (NULL == file) {
-        ERR("could not run command %s", command);
-    }
-
-    while (fgets(result, sizeof(result) - 1, file) != NULL) {}
-    result[strlen(result) - 1] = '\0';
-    status = pclose(file);
-
-    /* image check failed */
-    if (0 != WEXITSTATUS(status)) {
-        if (0 < strlen(result)) {
-            ERR("upgrade faild with message:%s", result);
-            SET_MEM_STR(ctx->installing_software.message, result);
-            SET_MEM_STR(ctx->installing_software.status, "upgrade-failed");
-        }
-        return SR_ERR_INTERNAL;
-    }
+    system(command);
 
     SET_MEM_STR(ctx->installing_software.status, "upgrade-done");
 
