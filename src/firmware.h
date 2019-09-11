@@ -25,76 +25,76 @@
 #define YANG "terastream-software"
 
 #include <sysrepo.h>
+
 #include "sysrepo/xpath.h"
-#include <sysrepo/plugins.h>
 
 size_t sysupgrade_pid;
 
 typedef enum proto_type_e {
-    PROTO_HTTP = 0,
-    PROTO_HTTPS,
-    PROTO_FTP,
-    PROTO_SCP,
+  PROTO_HTTP = 0,
+  PROTO_HTTPS,
+  PROTO_FTP,
+  PROTO_SCP,
 } proto_type_t;
 
 typedef enum cred_type_e {
-    CRED_PASSWD = 0,
-    CRED_CERT,
-    CRED_SSH_KEY,
+  CRED_PASSWD = 0,
+  CRED_CERT,
+  CRED_SSH_KEY,
 } cred_type_t;
 
 typedef enum cksum_type_e {
-    CKSUM_MD5 = 0,
-    CKSUM_SHA1,
-    CKSUM_SHA2,
-    CKSUM_SHA3,
-    CKSUM_SHA256,
+  CKSUM_MD5 = 0,
+  CKSUM_SHA1,
+  CKSUM_SHA2,
+  CKSUM_SHA3,
+  CKSUM_SHA256,
 } cksum_type_t;
 
 typedef struct firmware_s {
-    struct source {
-        proto_type_t proto;
-        char *uri;
-    } source;
-    struct credentials {
-        cred_type_t type;
-        char *val;
-    } credentials;
-    struct cksum {
-        cksum_type_t type;
-        char *val;
-    } cksum;
-    bool preserve_configuration;
-    struct download_policy {
-        uint32_t download_attempts;
-        uint32_t retry_interval;
-        uint32_t retry_randomness;
-    } policy;
-    // TODO     struct upgrade_policy {
+  struct source {
+    proto_type_t proto;
+    char *uri;
+  } source;
+  struct credentials {
+    cred_type_t type;
+    char *val;
+  } credentials;
+  struct cksum {
+    cksum_type_t type;
+    char *val;
+  } cksum;
+  bool preserve_configuration;
+  struct download_policy {
+    uint32_t download_attempts;
+    uint32_t retry_interval;
+    uint32_t retry_randomness;
+  } policy;
+  // TODO     struct upgrade_policy {
 } firmware_t;
 
 typedef struct software_oper {
-    char *uri;
-    char *version;
-    char *status;
-    char *message;
+  char *uri;
+  char *version;
+  char *status;
+  char *message;
 } oper;
 
 typedef struct ctx_s {
-    const char *yang_model;
-    sr_session_ctx_t *sess;
-    sr_subscription_ctx_t *sub;
-    sr_conn_ctx_t *startup_conn;
-    sr_session_ctx_t *startup_sess;
-    firmware_t firmware;
-    oper installing_software;
-    oper running_software;
+  const char *yang_model;
+  sr_session_ctx_t *sess;
+  sr_subscription_ctx_t *sub;
+  sr_conn_ctx_t *startup_conn;
+  sr_session_ctx_t *startup_sess;
+  firmware_t firmware;
+  oper installing_software;
+  oper running_software;
 } ctx_t;
 
 typedef struct ubus_ctx_s {
-	ctx_t *ctx;
-	sr_val_t **values;
-	size_t *values_cnt;
+  ctx_t *ctx;
+  sr_val_t **values;
+  size_t *values_cnt;
 } ubus_ctx_t;
 
 #endif /* FIRMWARE_H */

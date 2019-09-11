@@ -26,95 +26,90 @@
 
 #define ARR_SIZE(a) sizeof a / sizeof a[0]
 
-#include "sysrepo/plugins.h"
-
 #ifdef PLUGIN
-#define ERR(MSG, ...) SRP_LOG_ERR(MSG, ...)
-#define ERR_MSG(MSG) SRP_LOG_ERR_MSG(MSG)
-#define WRN(MSG, ...) define SRP_LOG_WRN(MSG, ...)
-#define WRN_MSG(MSG) define SRP_LOG_WRN_MSG(MSG)
-#define INF(MSG, ...) SRP_LOG_INF(MSG, ...)
-#define INF_MSG(MSG) SRP_LOG_INF_MSG(MSG)
-#define DBG(MSG, ...) SRP_LOG_DBG(MSG, ...)
-#define DBG_MSG(MSG) SRP_LOG_DBG_MSG(MSG)
+#define ENABLE_LOGGING(LOG_LEVEL) sr_log_syslog((LOG_LEVEL))
 #else
-#define ERR(MSG, ...) SRP_LOG__STDERR(SR_LL_ERR, MSG, __VA_ARGS__)
-#define ERR_MSG(MSG) SRP_LOG__STDERR(SR_LL_ERR, MSG "%s", "")
-#define WRN(MSG, ...) SRP_LOG__STDERR(SR_LL_WRN, MSG, __VA_ARGS__)
-#define WRN_MSG(MSG) SRP_LOG__STDERR(SR_LL_WRN, MSG "%s", "")
-#define INF(MSG, ...) SRP_LOG__STDERR(SR_LL_INF, MSG, __VA_ARGS__)
-#define INF_MSG(MSG) SRP_LOG__STDERR(SR_LL_INF, MSG "%s", "")
-#define DBG(MSG, ...) SRP_LOG__STDERR(SR_LL_DBG, MSG, __VA_ARGS__)
-#define DBG_MSG(MSG) SRP_LOG__STDERR(SR_LL_DBG, MSG "%s", "")
+#define ENABLE_LOGGING(LOG_LEVEL) sr_log_stderr((LOG_LEVEL))
 #endif
 
-#define CHECK_RET_MSG(RET, LABEL, MSG)                                                                                                               \
-    do {                                                                                                                                             \
-        if (SR_ERR_OK != RET) {                                                                                                                      \
-            ERR_MSG(MSG) SRP_LOG_ERR_MSG(MSG);                                                                                                       \
-            goto LABEL;                                                                                                                              \
-        }                                                                                                                                            \
-    } while (0)
+#define ERR(MSG, ...) SRP_LOG_ERR(MSG, __VA_ARGS__)
+#define ERR_MSG(MSG) SRP_LOG_ERRMSG(MSG)
+#define WRN(MSG, ...) SRP_LOG_WRN(MSG, __VA_ARGS__)
+#define WRN_MSG(MSG) SRP_LOG_WRNMSG(MSG)
+#define INF(MSG, ...) SRP_LOG_INF(MSG, __VA_ARGS__)
+#define INF_MSG(MSG) SRP_LOG_INFMSG(MSG)
+#define DBG(MSG, ...) SRP_LOG_DBG(MSG, __VA_ARGS__)
+#define DBG_MSG(MSG) SRP_LOG_DBGMSG(MSG)
 
-#define CHECK_RET(RET, LABEL, MSG, ...)                                                                                                              \
-    do {                                                                                                                                             \
-        if (SR_ERR_OK != RET) {                                                                                                                      \
-            ERR(MSG, __VA_ARGS__) SRP_LOG_ERR(MSG, __VA_ARGS__);                                                                                     \
-            goto LABEL;                                                                                                                              \
-        }                                                                                                                                            \
-    } while (0)
+#define CHECK_RET_MSG(RET, LABEL, MSG)                                         \
+  do {                                                                         \
+    if (SR_ERR_OK != RET) {                                                    \
+      ERR_MSG(MSG);                                                            \
+      goto LABEL;                                                              \
+    }                                                                          \
+  } while (0)
 
-#define CHECK_NULL_MSG(VALUE, RET, LABEL, MSG)                                                                                                       \
-    do {                                                                                                                                             \
-        if (NULL == VALUE) {                                                                                                                         \
-            *RET = SR_ERR_NOMEM;                                                                                                                     \
-            ERR_MSG(MSG) SRP_LOG_ERR_MSG(MSG);                                                                                                       \
-            goto LABEL;                                                                                                                              \
-        }                                                                                                                                            \
-    } while (0)
+#define CHECK_RET(RET, LABEL, MSG, ...)                                        \
+  do {                                                                         \
+    if (SR_ERR_OK != RET) {                                                    \
+      ERR(MSG, __VA_ARGS__);                                                   \
+      goto LABEL;                                                              \
+    }                                                                          \
+  } while (0)
 
-#define CHECK_NULL(VALUE, RET, LABEL, MSG, ...)                                                                                                      \
-    do {                                                                                                                                             \
-        if (NULL == VALUE) {                                                                                                                         \
-            *RET = SR_ERR_NOMEM;                                                                                                                     \
-            ERR(MSG, __VA_ARGS__) SRP_LOG_ERR(MSG, __VA_ARGS__);                                                                                     \
-            goto LABEL;                                                                                                                              \
-        }                                                                                                                                            \
-    } while (0)
+#define CHECK_NULL_MSG(VALUE, RET, LABEL, MSG)                                 \
+  do {                                                                         \
+    if (NULL == VALUE) {                                                       \
+      *RET = SR_ERR_INTERNAL;                                                  \
+      ERR_MSG(MSG);                                                            \
+      goto LABEL;                                                              \
+    }                                                                          \
+  } while (0)
 
-#define UCI_CHECK_RET_MSG(RET, LABEL, MSG)                                                                                                           \
-    do {                                                                                                                                             \
-        if (UCI_OK != RET) {                                                                                                                         \
-            ERR_MSG(MSG) SRP_LOG_ERR_MSG(MSG);                                                                                                       \
-            goto LABEL;                                                                                                                              \
-        }                                                                                                                                            \
-    } while (0)
+#define CHECK_NULL(VALUE, RET, LABEL, MSG, ...)                                \
+  do {                                                                         \
+    if (NULL == VALUE) {                                                       \
+      *RET = SR_ERR_INTERNAL;                                                  \
+      ERR(MSG, __VA_ARGS__);                                                   \
+      goto LABEL;                                                              \
+    }                                                                          \
+  } while (0)
 
-#define UCI_CHECK_RET(RET, LABEL, MSG, ...)                                                                                                          \
-    do {                                                                                                                                             \
-        if (UCI_OK != RET) {                                                                                                                         \
-            ERR(MSG, __VA_ARGS__) SRP_LOG_ERR(MSG, __VA_ARGS__);                                                                                     \
-            goto LABEL;                                                                                                                              \
-        }                                                                                                                                            \
-    } while (0)
+#define UCI_CHECK_RET_MSG(UCI_RET, SR_RET, LABEL, MSG)                         \
+  do {                                                                         \
+    if (UCI_OK != UCI_RET) {                                                   \
+      ERR_MSG(MSG)                                                             \
+      *SR_RET = SR_ERR_INTERNAL;                                               \
+      goto LABEL;                                                              \
+    }                                                                          \
+  } while (0)
 
-#define SET_STR(VAR, DATA)                                                                                                                           \
-    do {                                                                                                                                             \
-        if (VAR != NULL) {                                                                                                                           \
-            free(VAR);                                                                                                                               \
-        }                                                                                                                                            \
-        if (DATA != NULL) {                                                                                                                          \
-            VAR = strdup(DATA ? DATA : "");                                                                                                          \
-        } else {                                                                                                                                     \
-            VAR = NULL;                                                                                                                              \
-        }                                                                                                                                            \
-    } while (0)
+#define UCI_CHECK_RET(UCI_RET, SR_RET, LABEL, MSG, ...)                        \
+  do {                                                                         \
+    if (UCI_OK != UCI_RET) {                                                   \
+      ERR(MSG, __VA_ARGS__);                                                   \
+      *SR_RET = SR_ERR_INTERNAL;                                               \
+      goto LABEL;                                                              \
+    }                                                                          \
+  } while (0)
 
-#define SET_MEM_STR(VAR, DATA)                                                                                                                       \
-    do {                                                                                                                                             \
-        if (DATA != NULL) {                                                                                                                          \
-            memcpy(VAR, DATA, sizeof(DATA));                                                                                                         \
-        }                                                                                                                                            \
-    } while (0)
+#define SET_STR(VAR, DATA)                                                     \
+  do {                                                                         \
+    if (VAR != NULL) {                                                         \
+      free(VAR);                                                               \
+    }                                                                          \
+    if (DATA != NULL) {                                                        \
+      VAR = strdup(DATA ? DATA : "");                                          \
+    } else {                                                                   \
+      VAR = NULL;                                                              \
+    }                                                                          \
+  } while (0)
+
+#define SET_MEM_STR(VAR, DATA)                                                 \
+  do {                                                                         \
+    if (DATA != NULL) {                                                        \
+      memcpy(VAR, DATA, sizeof(DATA));                                         \
+    }                                                                          \
+  } while (0)
 
 #endif /* __COMMON_H__ */
