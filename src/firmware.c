@@ -758,6 +758,8 @@ static int software_version_cb(sr_session_ctx_t *session,
   char *value_string = NULL;
   const struct ly_ctx *ly_ctx = NULL;
 
+  INF_MSG("Getting oper data: software version");
+
   struct ubus_context *u_ctx = ubus_connect(NULL);
   if (u_ctx == NULL) {
     ERR_MSG("Could not connect to ubus");
@@ -945,32 +947,37 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx) {
   CHECK_RET(rc, error, "failed to load startup datastore: %s", sr_strerror(rc));
 
   rc = sr_module_change_subscribe(
-      ctx->sess, YANG, "/ietf-system:system/" YANG ":software", change_cb,
-      *private_ctx, 0, SR_SUBSCR_DEFAULT, &ctx->sub);
+      ctx->sess, "ietf-system", "/ietf-system:system/" YANG ":software",
+      change_cb, *private_ctx, 0, SR_SUBSCR_DEFAULT, &ctx->sub);
   CHECK_RET(rc, error, "initialization error: %s", sr_strerror(rc));
 
   rc = sr_oper_get_items_subscribe(
-      ctx->sess, YANG,
+      ctx->sess, "ietf-system",
       "/ietf-system:system-state/ietf-system:platform/" YANG
       ":software-version",
       software_version_cb, ctx, SR_SUBSCR_CTX_REUSE, &ctx->sub);
-  CHECK_RET(rc, error, "failed sr_dp_get_items_subscribe: %s", sr_strerror(rc));
+  CHECK_RET(rc, error, "failed sr_oper_get_items_subscribe: %s",
+            sr_strerror(rc));
 
   rc = sr_oper_get_items_subscribe(
-      ctx->sess, YANG,
+      ctx->sess, "ietf-system",
       "/ietf-system:system-state/ietf-system:platform/" YANG ":serial-number",
       serial_number_cb, ctx, SR_SUBSCR_CTX_REUSE, &ctx->sub);
-  CHECK_RET(rc, error, "failed sr_dp_get_items_subscribe: %s", sr_strerror(rc));
+  CHECK_RET(rc, error, "failed sr_oper_get_items_subscribe: %s",
+            sr_strerror(rc));
 
   rc = sr_oper_get_items_subscribe(
-      ctx->sess, YANG, "/ietf-system:system-state/" YANG ":software",
+      ctx->sess, "ietf-system", "/ietf-system:system-state/" YANG ":software",
       state_data_cb, ctx, SR_SUBSCR_CTX_REUSE, &ctx->sub);
-  CHECK_RET(rc, error, "failed sr_dp_get_items_subscribe: %s", sr_strerror(rc));
+  CHECK_RET(rc, error, "failed sr_oper_get_items_subscribe: %s",
+            sr_strerror(rc));
 
   rc = sr_oper_get_items_subscribe(
-      ctx->sess, YANG, "/ietf-system:system-state/" YANG ":running-software",
+      ctx->sess, "ietf-system",
+      "/ietf-system:system-state/" YANG ":running-software",
       running_software_cb, ctx, SR_SUBSCR_CTX_REUSE, &ctx->sub);
-  CHECK_RET(rc, error, "failed sr_dp_get_items_subscribe: %s", sr_strerror(rc));
+  CHECK_RET(rc, error, "failed sr_oper_get_items_subscribe: %s",
+            sr_strerror(rc));
 
   rc = sr_rpc_subscribe(ctx->sess, "/" YANG ":system-reset-restart",
                         rpc_firstboot_cb, ctx, 0, SR_SUBSCR_CTX_REUSE,
@@ -980,6 +987,8 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx) {
   rc = sr_rpc_subscribe(ctx->sess, "/ietf-system:system-restart", rpc_reboot_cb,
                         ctx, 0, SR_SUBSCR_CTX_REUSE, &ctx->sub);
   CHECK_RET(rc, error, "failed sr_rpc_subscribe: %s", sr_strerror(rc));
+
+  INF_MSG("Plugin initialization successfull");
 
   return SR_ERR_OK;
 
@@ -1045,6 +1054,8 @@ int main() {
   sr_session_ctx_t *session = NULL;
   void *private_ctx = NULL;
   int rc = SR_ERR_OK;
+
+  ENABLE_LOGGING(SR_LL_DBG);
 
   /* connect to sysrepo */
   rc = sr_connect(SR_CONN_DEFAULT, &connection);
