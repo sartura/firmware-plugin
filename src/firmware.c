@@ -70,7 +70,7 @@ int load_startup_datastore(ctx_t *ctx) {
   // load the startup firmware data into plugin
   char *xpath = "/ietf-system:system/" YANG ":software/software//*";
 
-  rc = sr_get_items(ctx->startup_sess, xpath, &values, &count);
+  rc = sr_get_items(ctx->startup_sess, xpath, 0, &values, &count);
   if (SR_ERR_NOT_FOUND == rc) {
     INF_MSG("empty startup datastore for firmware data");
     return SR_ERR_OK;
@@ -368,7 +368,7 @@ static int change_cb(sr_session_ctx_t *session, const char *module_name,
     /* copy running datastore to startup */
 
     rc = sr_copy_config(ctx->startup_sess, "ietf-system", SR_DS_RUNNING,
-                        SR_DS_STARTUP);
+                        SR_DS_STARTUP, 0);
     if (SR_ERR_OK != rc) {
       WRN_MSG("Failed to copy running datastore to startup");
       /* TODO handle this error */
