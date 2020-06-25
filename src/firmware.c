@@ -29,6 +29,8 @@
 #define VERSION_YANG_STATE_PATH  "/ietf-system:system-state/platform/" SOFTWARE_YANG_MODEL ":software-version"
 #define SERIALNO_YANG_STATE_PATH "/ietf-system:system-state/platform/" SOFTWARE_YANG_MODEL ":serial-number"
 
+static void sigusr1_handler(__attribute__((unused)) int signum);
+
 int firmware_plugin_init_cb(sr_session_ctx_t *session, void **private_data);
 void firmware_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_data);
 
@@ -44,6 +46,9 @@ static int firmware_rpc_cb(sr_session_ctx_t *session, const char *op_path,
 			   sr_event_t event, uint32_t request_id,
 			   sr_val_t **output, size_t *output_cnt,
 			   void *private_data);
+
+pid_t sysupgrade_pid;
+pid_t restart_pid;
 
 
 int firmware_plugin_init_cb(sr_session_ctx_t *session, void **private_data)
@@ -115,10 +120,17 @@ int firmware_plugin_init_cb(sr_session_ctx_t *session, void **private_data)
 		SRP_LOG_ERR("sr_oper_get_items_subscribe error (%d): %s", error, sr_strerror(error));
 		goto error_out;
 	}
-	
+
 	SRP_LOG_INFMSG("subscribing to rpc");
 
 	error = sr_rpc_subscribe(session, RESTART_YANG_PATH,
+				 firmware_rpc_cb, *private_data, 0, SR_SUBSCR_CTX_REUSE, &subscription);
+	if (error) {
+		SRP_LOG_ERR("sr_rpc_subscribe error (%d): %s", error, sr_strerror(error));
+		goto error_out;
+	}
+
+	error = sr_rpc_subscribe(session, RESET_YANG_PATH,
 				 firmware_rpc_cb, *private_data, 0, SR_SUBSCR_CTX_REUSE, &subscription);
 	if (error) {
 		SRP_LOG_ERR("sr_rpc_subscribe error (%d): %s", error, sr_strerror(error));
@@ -172,7 +184,53 @@ static int firmware_rpc_cb(sr_session_ctx_t *session, const char *op_path,
 			   sr_val_t **output, size_t *output_cnt,
 			   void *private_data)
 {
-	return SR_ERR_CALLBACK_FAILED;
+	int error = 0;
+	srpo_ubus_call_data_t ubus_call_data = {
+		.lookup_path = NULL, .method = NULL, .transform_data_cb = NULL,
+		.timeout = 0, .json_call_arguments = NULL
+	};
+
+	signal(SIGUSR1, sigusr1_handler);
+
+	restart_pid = fork();
+	if (restart_pid < 0) {
+		SRP_LOG_ERRMSG("firmware_rpc_cb: unable to fork");
+		return SR_ERR_CALLBACK_FAILED;
+	}
+
+	if (restart_pid == 0) {
+		sleep(3);
+
+		ubus_call_data.lookup_path = "juci.system";
+
+		if (strcmp(op_path, RESTART_YANG_PATH) == 0) {
+			ubus_call_data.method = "reboot";
+		} else if (strcmp(op_path, RESET_YANG_PATH) == 0) {
+			ubus_call_data.method = "defaultreset";
+		} else {
+			SRP_LOG_ERR("firmware_rpc_cb: invalid path %s", op_path);
+			exit(EXIT_FAILURE);
+		}
+
+		error = srpo_ubus_call(NULL, &ubus_call_data);
+		if (error != SRPO_UBUS_ERR_OK) {
+			SRP_LOG_ERR("srpo_ubus_call error (%d): %s", error, srpo_ubus_error_description_get(error));
+			exit(EXIT_FAILURE);
+		}
+
+		exit(EXIT_SUCCESS);
+	} else {
+		SRP_LOG_DBG("firmware_rpc_cb: child in %d", restart_pid);
+	}
+
+	return SR_ERR_OK;
+}
+
+static void sigusr1_handler(__attribute__((unused)) int signum)
+{
+	SRP_LOG_INFMSG("SIGUSR1 called, killing children...");
+	kill(sysupgrade_pid, SIGKILL);
+	kill(restart_pid, SIGKILL);
 }
 
 
@@ -185,7 +243,7 @@ static void sigint_handler(__attribute__((unused)) int signum);
 
 int main()
 {
-  int error = SR_ERR_OK;
+	int error = SR_ERR_OK;
 	sr_conn_ctx_t *connection = NULL;
 	sr_session_ctx_t *session = NULL;
 	void *private_data = NULL;
@@ -207,7 +265,7 @@ int main()
 
 	error = firmware_plugin_init_cb(session, &private_data);
 	if (error) {
-		SRP_LOG_ERRMSG("dhcp_plugin_init_cb error");
+		SRP_LOG_ERRMSG("firmware_plugin_init_cb error");
 		goto out;
 	}
 
