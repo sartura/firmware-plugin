@@ -27,7 +27,7 @@
 #define SOFTWARE_YANG_STATE_PATH "/ietf-system:system-state/" SOFTWARE_YANG_MODEL ":software"
 #define RUNNING_YANG_STATE_PATH  "/ietf-system:system-state/" SOFTWARE_YANG_MODEL ":running-software"
 #define VERSION_YANG_STATE_PATH  "/ietf-system:system-state/platform/" SOFTWARE_YANG_MODEL ":software-version"
-#define SERIALNO_YANG_STATE_PATH "/ietf-system:system-state/platform/" SOFTWARE_YANG_MODEL ":serial-number"
+#define SERIAL_YANG_STATE_PATH   "/ietf-system:system-state/platform/" SOFTWARE_YANG_MODEL ":serial-number"
 
 static void sigusr1_handler(__attribute__((unused)) int signum);
 
@@ -35,17 +35,19 @@ int firmware_plugin_init_cb(sr_session_ctx_t *session, void **private_data);
 void firmware_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_data);
 
 static int firmware_module_change_cb(sr_session_ctx_t *session, const char *module_name,
-				     const char *xpath, sr_event_t event,
-				     uint32_t request_id, void *private_data);
+				     const char *xpath, sr_event_t event, uint32_t request_id, void *private_data);
 static int firmware_state_data_cb(sr_session_ctx_t *session, const char *module_name,
-				  const char *path, const char *request_xpath,
-				  uint32_t request_id, struct lyd_node **parent,
-				  void *private_data);
+				  const char *path, const char *request_xpath, uint32_t request_id,
+				  struct lyd_node **parent, void *private_data);
 static int firmware_rpc_cb(sr_session_ctx_t *session, const char *op_path,
 			   const sr_val_t *input, const size_t input_cnt,
 			   sr_event_t event, uint32_t request_id,
-			   sr_val_t **output, size_t *output_cnt,
-			   void *private_data);
+			   sr_val_t **output, size_t *output_cnt, void *private_data);
+
+static void firmware_ubus_version(const char *ubus_json, srpo_ubus_result_values_t *values);
+static void firmware_ubus_serial(const char *ubus_json, srpo_ubus_result_values_t *values);
+static int store_ubus_values_to_datastore(sr_session_ctx_t *session, const char *request_xpath,
+					  srpo_ubus_result_values_t *values, struct lyd_node **parent);
 
 pid_t sysupgrade_pid;
 pid_t restart_pid;
@@ -114,7 +116,7 @@ int firmware_plugin_init_cb(sr_session_ctx_t *session, void **private_data)
 		goto error_out;
 	}
 
-	error = sr_oper_get_items_subscribe(session, BASE_YANG_MODEL, SERIALNO_YANG_STATE_PATH,
+	error = sr_oper_get_items_subscribe(session, BASE_YANG_MODEL, SERIAL_YANG_STATE_PATH,
 					    firmware_state_data_cb, *private_data, SR_SUBSCR_CTX_REUSE, &subscription);
 	if (error) {
 		SRP_LOG_ERR("sr_oper_get_items_subscribe error (%d): %s", error, sr_strerror(error));
@@ -171,11 +173,49 @@ static int firmware_module_change_cb(sr_session_ctx_t *session, const char *modu
 }
 
 static int firmware_state_data_cb(sr_session_ctx_t *session, const char *module_name,
-				  const char *path, const char *request_xpath,
-				  uint32_t request_id, struct lyd_node **parent,
-				  void *private_data)
+				     const char *path, const char *request_xpath, uint32_t request_id,
+				     struct lyd_node **parent, void *private_data)
 {
-	return SR_ERR_CALLBACK_FAILED;
+	int error = SRPO_UBUS_ERR_OK;
+	srpo_ubus_result_values_t *values = NULL;
+	srpo_ubus_call_data_t ubus_call_data = {
+		.lookup_path = NULL, .method = NULL, .transform_data_cb = NULL,
+		.timeout = 0, .json_call_arguments = NULL
+	};
+
+	ubus_call_data.lookup_path = "router.system";
+	ubus_call_data.method = "info";
+
+	if (strcmp(path, VERSION_YANG_STATE_PATH) == 0) {
+		ubus_call_data.transform_data_cb = firmware_ubus_version;
+	} else if (strcmp(path, SERIAL_YANG_STATE_PATH) == 0) {
+		ubus_call_data.transform_data_cb = firmware_ubus_serial;
+	} else {
+		SRP_LOG_ERR("firmware_state_data_cb: invalid path %s", path);
+		goto out;
+	}
+
+	srpo_ubus_init_result_values(&values);
+
+	error = srpo_ubus_call(values, &ubus_call_data);
+	if (error != SRPO_UBUS_ERR_OK) {
+		SRP_LOG_ERR("srpo_ubus_call error (%d): %s", error, srpo_ubus_error_description_get(error));
+		goto out;
+	}
+
+	error = store_ubus_values_to_datastore(session, request_xpath, values, parent);
+	// TODO fix error handling here
+	if (error) {
+		SRP_LOG_ERR("store_ubus_values_to_datastore error (%d)", error);
+		goto out;
+	}
+
+out:
+	if (values) {
+		srpo_ubus_free_result_values(values);
+	}
+
+	return error ? SR_ERR_CALLBACK_FAILED : SR_ERR_OK;
 }
 
 static int firmware_rpc_cb(sr_session_ctx_t *session, const char *op_path,
@@ -224,6 +264,74 @@ static int firmware_rpc_cb(sr_session_ctx_t *session, const char *op_path,
 	}
 
 	return SR_ERR_OK;
+}
+
+static void firmware_ubus_version(const char *ubus_json, srpo_ubus_result_values_t *values)
+{
+	json_object *result = NULL;
+	json_object *system = NULL;
+	json_object *firmware = NULL;
+	const char *string = NULL;
+	srpo_ubus_error_e error = SRPO_UBUS_ERR_OK;
+
+	result = json_tokener_parse(ubus_json);
+	json_object_object_get_ex(result, "system", &system);
+	json_object_object_get_ex(system, "firmware", &firmware);
+	string = json_object_get_string(firmware);
+
+	error = srpo_ubus_result_values_add(values, string, strlen(string),
+					    VERSION_YANG_STATE_PATH, strlen(VERSION_YANG_STATE_PATH),
+					    " ", strlen(" "));
+	if (error != SRPO_UBUS_ERR_OK) {
+		goto cleanup;
+	}
+
+cleanup:
+	json_object_put(result);
+	return;
+}
+
+static void firmware_ubus_serial(const char *ubus_json, srpo_ubus_result_values_t *values)
+{
+	json_object *result = NULL;
+	json_object *system = NULL;
+	json_object *firmware = NULL;
+	const char *string = NULL;
+	srpo_ubus_error_e error = SRPO_UBUS_ERR_OK;
+
+	result = json_tokener_parse(ubus_json);
+	json_object_object_get_ex(result, "system", &system);
+	json_object_object_get_ex(system, "serialno", &firmware);
+	string = json_object_get_string(firmware);
+
+	error = srpo_ubus_result_values_add(values, string, strlen(string),
+					    SERIAL_YANG_STATE_PATH, strlen(SERIAL_YANG_STATE_PATH),
+					    " ", strlen(" "));
+	if (error != SRPO_UBUS_ERR_OK) {
+		goto cleanup;
+	}
+
+cleanup:
+	json_object_put(result);
+	return;
+}
+
+static int store_ubus_values_to_datastore(sr_session_ctx_t *session, const char *request_xpath, srpo_ubus_result_values_t *values, struct lyd_node **parent)
+{
+	const struct ly_ctx *ly_ctx = NULL;
+	if (*parent == NULL) {
+		ly_ctx = sr_get_context(sr_session_get_connection(session));
+		if (ly_ctx == NULL) {
+			return -1;
+		}
+		*parent = lyd_new_path(NULL, ly_ctx, request_xpath, NULL, 0, 0);
+	}
+
+	for (size_t i = 0; i < values->num_values; i++) {
+		lyd_new_path(*parent, NULL, values->values[i].xpath, values->values[i].value, 0, 0);
+	}
+
+	return 0;
 }
 
 static void sigusr1_handler(__attribute__((unused)) int signum)
