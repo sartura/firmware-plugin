@@ -10,7 +10,6 @@ include_directories(${CMAKE_SOURCE_DIR}/src/)
 
 set(SOURCES
     src/firmware.c
-    src/parse.c
 )
 
 # git SHA1 hash
