@@ -1,3 +1,3 @@
 <action xmlns="urn:ietf:params:xml:ns:yang:1">
-  <system-reset-restart xmlns="http://terastrm.net/ns/yang/terastream-software-hack"/>
+  <system-reset-restart xmlns="http://terastrm.net/ns/yang/terastream-software"/>
 </action>

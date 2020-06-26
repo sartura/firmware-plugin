@@ -10,6 +10,8 @@ include_directories(${CMAKE_SOURCE_DIR}/src/)
 
 set(SOURCES
     src/firmware.c
+    src/upgrade.c
+    src/utils/memory.c
 )
 
 # git SHA1 hash
