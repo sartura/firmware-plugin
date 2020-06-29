@@ -110,10 +110,4 @@ typedef struct plugin_ctx_s {
 	oper_t running_software;
 } plugin_ctx_t;
 
-typedef struct ubus_ctx_s {
-	plugin_ctx_t *ctx;
-	sr_val_t **values;
-	size_t *values_cnt;
-} ubus_ctx_t;
-
 #endif /* FIRMWARE_H */

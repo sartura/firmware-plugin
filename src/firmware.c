@@ -11,7 +11,6 @@
 #include <sysrepo/xpath.h>
 #include <sysrepo/values.h>
 
-#include <srpo_uci.h>
 #include <srpo_ubus.h>
 
 #include "firmware.h"
@@ -83,12 +82,6 @@ int firmware_plugin_init_cb(sr_session_ctx_t *session, void **private_data)
 	sr_subscription_ctx_t *subscription = NULL;
 
 	*private_data = NULL;
-
-	error = srpo_uci_init();
-	if (error) {
-		SRP_LOG_ERR("srpo_uci_init error (%d): %s", error, srpo_uci_error_description_get(error));
-		goto error_out;
-	}
 
 	SRP_LOG_INFMSG("start session to startup datastore");
 
@@ -188,8 +181,6 @@ out:
 
 void firmware_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_data)
 {
-	srpo_uci_cleanup();
-
 	plugin_ctx_t *ctx = (plugin_ctx_t *) private_data;
 
 	if (ctx->startup_session) {
