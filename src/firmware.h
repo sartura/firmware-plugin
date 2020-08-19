@@ -22,24 +22,24 @@
 #ifndef FIRMWARE_H
 #define FIRMWARE_H
 
-#define SET_STR(VAR, DATA)                                                     \
-  do {                                                                         \
-    if (VAR != NULL) {                                                         \
-      free(VAR);                                                               \
-    }                                                                          \
-    if (DATA != NULL) {                                                        \
-      VAR = strdup(DATA ? DATA : "");                                          \
-    } else {                                                                   \
-      VAR = NULL;                                                              \
-    }                                                                          \
-  } while (0)
+#define SET_STR(VAR, DATA)                  \
+	do {                                    \
+		if (VAR != NULL) {                  \
+			free(VAR);                      \
+		}                                   \
+		if (DATA != NULL) {                 \
+			VAR = strdup(DATA ? DATA : ""); \
+		} else {                            \
+			VAR = NULL;                     \
+		}                                   \
+	} while (0)
 
-#define SET_MEM_STR(VAR, DATA)                                                 \
-  do {                                                                         \
-    if (DATA != NULL) {                                                        \
-      memcpy(VAR, DATA, sizeof(DATA));                                         \
-    }                                                                          \
-  } while (0)
+#define SET_MEM_STR(VAR, DATA)               \
+	do {                                     \
+		if (DATA != NULL) {                  \
+			memcpy(VAR, DATA, sizeof(DATA)); \
+		}                                    \
+	} while (0)
 
 #include <sysrepo.h>
 #include "sysrepo/xpath.h"

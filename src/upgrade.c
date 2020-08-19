@@ -23,7 +23,8 @@
 
 const char file_path[FILENAME_MAX] = "/tmp/sr_firmware.bin";
 
-void delete_firmware(const char *filename) {
+void delete_firmware(const char *filename)
+{
 	int ret;
 
 	ret = remove(filename);
@@ -387,32 +388,32 @@ int download_firmware(plugin_ctx_t *ctx)
 
 	switch (ctx->firmware.credentials.type) {
 		case (CRED_PASSWD):;
-				   char *username = get_username_from_url(ctx->firmware.source.uri);
-				   char *cred = NULL;
-				   if (NULL != username && NULL != ctx->firmware.credentials.value) {
-					   cred = malloc(sizeof(char) * strlen(username) + strlen(ctx->firmware.credentials.value) + 2);
-					   sprintf(cred, "%s:%s", username, ctx->firmware.credentials.value);
-					   free(username);
-					   free(cred);
-				   } else {
-					   cred = strdup(ctx->firmware.credentials.value ? ctx->firmware.credentials.value : "");
-				   }
-				   curl_easy_setopt(curl, CURLOPT_USERPWD, cred);
-				   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, firmware_write_cb);
-				   free(cred);
-				   break;
+			char *username = get_username_from_url(ctx->firmware.source.uri);
+			char *cred = NULL;
+			if (NULL != username && NULL != ctx->firmware.credentials.value) {
+				cred = malloc(sizeof(char) * strlen(username) + strlen(ctx->firmware.credentials.value) + 2);
+				sprintf(cred, "%s:%s", username, ctx->firmware.credentials.value);
+				free(username);
+				free(cred);
+			} else {
+				cred = strdup(ctx->firmware.credentials.value ? ctx->firmware.credentials.value : "");
+			}
+			curl_easy_setopt(curl, CURLOPT_USERPWD, cred);
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, firmware_write_cb);
+			free(cred);
+			break;
 		case (CRED_CERT):
-				   curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, cert_type);
-				   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-				   curl_easy_setopt(curl, CURLOPT_SSL_CTX_FUNCTION, firmware_download_ssl);
-				   break;
+			curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, cert_type);
+			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+			curl_easy_setopt(curl, CURLOPT_SSL_CTX_FUNCTION, firmware_download_ssl);
+			break;
 		case (CRED_SSH_KEY):
-				   curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 0);
-				   curl_easy_setopt(curl, CURLOPT_SSH_AUTH_TYPES, CURLSSH_AUTH_PUBLICKEY);
-				   curl_easy_setopt(curl, CURLOPT_SSH_PUBLIC_KEYFILE, public_keyfile_path);
-				   curl_easy_setopt(curl, CURLOPT_SSH_PRIVATE_KEYFILE, public_keyfile_path);
-				   curl_easy_setopt(curl, CURLOPT_DIRLISTONLY, 1);
-				   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, firmware_write_cb);
+			curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 0);
+			curl_easy_setopt(curl, CURLOPT_SSH_AUTH_TYPES, CURLSSH_AUTH_PUBLICKEY);
+			curl_easy_setopt(curl, CURLOPT_SSH_PUBLIC_KEYFILE, public_keyfile_path);
+			curl_easy_setopt(curl, CURLOPT_SSH_PRIVATE_KEYFILE, public_keyfile_path);
+			curl_easy_setopt(curl, CURLOPT_DIRLISTONLY, 1);
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, firmware_write_cb);
 	}
 
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
@@ -423,7 +424,7 @@ int download_firmware(plugin_ctx_t *ctx)
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, (10 * 60));
 
 	while (0 == ctx->firmware.policy.download_attempts ||
-			(0 < ctx->firmware.policy.download_attempts && download_attempts < ctx->firmware.policy.download_attempts)) {
+		   (0 < ctx->firmware.policy.download_attempts && download_attempts < ctx->firmware.policy.download_attempts)) {
 		SRP_LOG_INFMSG("downloading");
 		SET_MEM_STR(ctx->installing_software.status, "downloading");
 		download_attempts++;
@@ -510,7 +511,8 @@ int install_firmware(plugin_ctx_t *ctx)
 		SRP_LOG_ERR("could not run command %s", command);
 	}
 
-	while (fgets(result, sizeof(result) - 1, file) != NULL) {}
+	while (fgets(result, sizeof(result) - 1, file) != NULL) {
+	}
 	result[strlen(result) - 1] = '\0';
 	int status = pclose(file);
 
