@@ -750,6 +750,9 @@ static int load_startup_datastore(plugin_ctx_t *ctx)
 		goto cleanup;
 	}
 
+	if (!root)
+		goto cleanup;
+
 	LY_TREE_FOR(root->child, child)
 	{
 		LY_TREE_DFS_BEGIN(child, next, node)
