@@ -37,9 +37,6 @@ static const char *RUNNING_XPATH = RUNNING_YANG_STATE_PATH;
 
 static void sigusr1_handler(__attribute__((unused)) int signum);
 
-int firmware_plugin_init_cb(sr_session_ctx_t *session, void **private_data);
-void firmware_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_data);
-
 static int firmware_module_change_cb(sr_session_ctx_t *session, const char *module_name, const char *xpath, sr_event_t event, uint32_t request_id, void *private_data);
 static int firmware_state_data_cb(sr_session_ctx_t *session, const char *module_name, const char *path, const char *request_xpath, uint32_t request_id, struct lyd_node **parent, void *private_data);
 static int firmware_state_software_cb(sr_session_ctx_t *session, const char *module_name, const char *path, const char *request_xpath, uint32_t request_id, struct lyd_node **parent, void *private_data);
@@ -64,7 +61,7 @@ static void firmware_ubus_version(const char *ubus_json, srpo_ubus_result_values
 static void firmware_ubus_serial(const char *ubus_json, srpo_ubus_result_values_t *values);
 static int store_ubus_values_to_datastore(sr_session_ctx_t *session, const char *request_xpath, srpo_ubus_result_values_t *values, struct lyd_node **parent);
 
-int firmware_plugin_init_cb(sr_session_ctx_t *session, void **private_data)
+int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_data)
 {
 	int error = 0;
 	plugin_ctx_t *ctx = NULL;
@@ -165,7 +162,7 @@ out:
 	return error ? SR_ERR_CALLBACK_FAILED : SR_ERR_OK;
 }
 
-void firmware_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_data)
+void sr_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_data)
 {
 	plugin_ctx_t *ctx = (plugin_ctx_t *) private_data;
 
@@ -829,9 +826,9 @@ int main()
 		goto out;
 	}
 
-	error = firmware_plugin_init_cb(session, &private_data);
+	error = sr_plugin_init_cb(session, &private_data);
 	if (error) {
-		SRP_LOG_ERRMSG("firmware_plugin_init_cb error");
+		SRP_LOG_ERRMSG("sr_plugin_init_cb error");
 		goto out;
 	}
 
@@ -843,7 +840,7 @@ int main()
 	}
 
 out:
-	firmware_plugin_cleanup_cb(session, private_data);
+	sr_plugin_cleanup_cb(session, private_data);
 	sr_disconnect(connection);
 
 	return error ? -1 : 0;
