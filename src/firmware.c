@@ -61,8 +61,8 @@ static void firmware_ubus_version(const char *ubus_json, srpo_ubus_result_values
 static void firmware_ubus_serial(const char *ubus_json, srpo_ubus_result_values_t *values);
 static int store_ubus_values_to_datastore(sr_session_ctx_t *session, const char *request_xpath, srpo_ubus_result_values_t *values, struct lyd_node **parent);
 
-pid_t sysupgrade_pid;
-pid_t restart_pid;
+static pid_t sysupgrade_pid;
+static pid_t restart_pid;
 
 int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_data)
 {
