@@ -44,9 +44,6 @@
 #include <sysrepo.h>
 #include "sysrepo/xpath.h"
 
-pid_t sysupgrade_pid;
-pid_t restart_pid;
-
 typedef enum proto_type_e {
 	PROTO_HTTP = 0,
 	PROTO_HTTPS,
